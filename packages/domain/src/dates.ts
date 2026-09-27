@@ -86,6 +86,34 @@ export function todayISO(now: Date = new Date()): ISODate {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * The calendar date of a moment, in a time zone: the machine's when none is
+ * given. A timestamp's own offset says nothing about whose day it is.
+ */
+export function dateIn(moment: ISODateTime | Date, timeZone?: string | null): ISODate | null {
+  const d = moment instanceof Date ? moment : new Date(moment);
+  if (Number.isNaN(d.getTime())) return null;
+  if (!timeZone) return todayISO(d);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(d);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/** True when a time zone name is one this machine knows. */
+export function isTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Compares two moments by when they happened, whatever offsets they were written with. */
+export function compareMoments(a: ISODateTime, b: ISODateTime): number {
+  return Date.parse(a) - Date.parse(b);
+}
+
 /** The calendar date part of an ISO date-time, taken as written (no time-zone conversion). */
 export function datePart(dateTime: ISODateTime): ISODate {
   return dateTime.slice(0, 10);

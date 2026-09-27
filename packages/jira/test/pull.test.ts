@@ -211,7 +211,7 @@ test("too many requests: wait, then try again; a refusal says why without the cr
     (err: unknown) => err instanceof JiraError && err.status === 401 && !err.message.includes("secret-token-123"),
   );
   assert.equal(waits.length, 2);
-  assert.ok(waits.every((w) => w >= 1000 * 0.7));
+  assert.ok(waits.every((w) => w >= 1000), "never sooner than Jira asked");
 });
 
 test("the connection comes from the environment, and refuses to send a token in the clear", () => {
@@ -237,12 +237,17 @@ test("fields are found by type, then by name, unless the settings say", () => {
   assert.deepEqual(findFields(fields, { points: null, sprint: null }, null), { points: "cf_2", sprint: "cf_1", flagged: null, epicLink: null });
   assert.equal(findFields(fields, { points: "cf_9", sprint: null }, "cf_8").points, "cf_9");
   assert.equal(findFields(fields, { points: null, sprint: null }, "cf_8").points, "cf_8");
+  const both = [{ id: "cf_28", name: "Story Points" }, { id: "cf_16", name: "Story point estimate" }];
+  assert.equal(findFields(both, { points: null, sprint: null }, null).points, "cf_16", "the names are tried in order");
 });
 
 test("sprint values and history, in their odd shapes", () => {
   assert.equal(parseSprintValue("not a sprint", "t"), null);
   assert.equal(parseSprintValue({ name: "no id" }, "t"), null);
   assert.equal(parseSprintValue({ id: 5, state: "FUTURE" }, "t")?.name, "Sprint 5");
+  const friday = { id: 6, state: "active", startDate: "2026-10-12T07:00:00.000Z", endDate: "2026-10-23T15:00:00.000Z" };
+  assert.equal(parseSprintValue(friday, "t", "Europe/Amsterdam")?.endDate, "2026-10-23", "the team's day, not this machine's");
+  assert.equal(parseSprintValue(friday, "t", "Australia/Brisbane")?.endDate, "2026-10-24");
   const cats = new Map([["3", "doing" as const]]);
   assert.equal(firstStarted([], cats, null), null);
   assert.equal(
@@ -250,4 +255,33 @@ test("sprint values and history, in their odd shapes", () => {
     "2026-10-02",
   );
   assert.equal(firstStarted([{ created: "2026-10-02", items: [{ field: "assignee", to: "3" }] }], cats, null), null);
+});
+
+test("a cut-short history is read whole, even when it already shows a move into progress", async () => {
+  const jira = fakeJira({
+    "/rest/api/3/myself": () => ({ accountId: "me" }),
+    "/rest/api/3/field": () => [],
+    "/rest/api/3/status": () => [{ id: "3", statusCategory: { key: "indeterminate" } }, { id: "4", statusCategory: { key: "indeterminate" } }],
+    "/rest/api/3/search/jql": () => ({
+      isLast: true,
+      issues: [
+        {
+          key: "ABC-9",
+          fields: { summary: "Long one", status: status("In Review", "indeterminate"), assignee: { accountId: "me" }, created: "2026-08-01T09:00:00.000+1000", updated: "2026-09-25T09:00:00.000+1000" },
+          changelog: { total: 30, histories: [{ created: "2026-09-25T09:00:00.000+1000", items: [{ field: "status", to: "4", toString: "In Review" }] }] },
+        },
+      ],
+    }),
+    "/rest/api/3/issue/ABC-9/changelog": () => ({
+      isLast: true,
+      values: [
+        { created: "2026-09-01T09:00:00.000+1000", items: [{ field: "status", to: "3", toString: "In Progress" }] },
+        { created: "2026-09-25T09:00:00.000+1000", items: [{ field: "status", to: "4", toString: "In Review" }] },
+      ],
+    }),
+  });
+  const store = SqliteStore.open(":memory:");
+  await pullFromJira(new Battlestation({ store }), { connection: cloud, fetch: jira.fetch });
+  assert.equal(store.getIssue("ABC-9")?.started, "2026-09-01T09:00:00.000+1000");
+  store.close();
 });

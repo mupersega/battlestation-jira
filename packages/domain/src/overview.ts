@@ -7,7 +7,7 @@
  * Derived, never stored.
  */
 
-import { addDays, compareDates, datePart, diffDays, sayDate, workingDaysBetween, type ISODate } from "./dates.js";
+import { addDays, compareDates, compareMoments, datePart, dateIn, diffDays, sayDate, workingDaysBetween, type ISODate } from "./dates.js";
 import { currentSprintId, type IssueLinkView, type IssueSnapshot, type SprintSnapshot, type SprintState } from "./jira.js";
 import { eventLifecycle, issueLifecycle, sprintLifecycle, taskLifecycle, type Lifecycle } from "./lifecycle.js";
 import type { AgendaItem, Event, IssueNote, PullRecord, Settings, Task } from "./types.js";
@@ -167,7 +167,7 @@ export function deriveOverview(input: OverviewInputs): Overview {
     issues[i.key] = {
       issue: i,
       note: note?.note ?? "",
-      fresh: !note?.seenUpdated || note.seenUpdated < i.updated,
+      fresh: !note?.seenUpdated || compareMoments(note.seenUpdated, i.updated) < 0,
       blockedBy: i.links.filter((l) => l.direction === "blocked_by" && l.statusCategory !== "done"),
       blocks: i.links.filter((l) => l.direction === "blocks"),
       tasks: live.filter((t) => t.issueKey === i.key),
@@ -177,6 +177,8 @@ export function deriveOverview(input: OverviewInputs): Overview {
     refs[`issue:${i.key}`] = i.key;
   }
   const mine = Object.values(issues).filter((v) => v.issue.assignedToMe);
+  const mineKeys = new Set(mine.map((v) => v.issue.key));
+  const loose = (t: Task) => !t.issueKey || !mineKeys.has(t.issueKey);
   const byKey = (a: IssueView, b: IssueView) => {
     const open = (v: IssueView) => (v.issue.statusCategory === "done" ? 1 : 0);
     const [pa, na] = a.issue.key.split("-");
@@ -188,19 +190,26 @@ export function deriveOverview(input: OverviewInputs): Overview {
   const ordered = [...input.sprints].sort(
     (a, b) => PHASE_ORDER[a.state] - PHASE_ORDER[b.state] || (a.startDate ?? "9999").localeCompare(b.startDate ?? "9999") || Number(a.id) - Number(b.id),
   );
-  const active = ordered.find((s) => s.state === "active") ?? null;
-  const nextSprint = ordered.find((s) => s.state === "future") ?? null;
+  // An issue can name a sprint of another board. With a board set, only its own can be the one under way or next.
+  const board = settings.jira.boardId;
+  const ours = (s: SprintSnapshot) => !board || s.boardId === null || s.boardId === board;
+  const active = ordered.find((s) => s.state === "active" && ours(s)) ?? null;
+  const nextSprint = ordered.find((s) => s.state === "future" && ours(s)) ?? null;
   const sprints: SprintOverview[] = ordered.map((s) => {
     const inIt = mine.filter((v) => currentSprintId(v.issue) === s.id).sort(byKey);
     const points: Points = { committed: 0, done: 0, doing: 0, todo: 0, unestimated: 0 };
+    const closedOn = s.state === "closed" ? (s.completeDate ?? s.endDate) : null;
     for (const v of inIt) {
       const p = v.issue.points;
+      let category = v.issue.statusCategory;
+      // Left open when its sprint closed and finished later: not that sprint's work.
+      if (category === "done" && closedOn && v.issue.resolved && compareDates(datePart(v.issue.resolved), closedOn) > 0) category = "todo";
       if (p === null) {
-        if (v.issue.statusCategory !== "done") points.unestimated += 1;
+        if (category !== "done") points.unestimated += 1;
         continue;
       }
       points.committed += p;
-      points[v.issue.statusCategory] += p;
+      points[category] += p;
     }
     const days = s.startDate && s.endDate ? workingDaysBetween(s.startDate, s.endDate) : null;
     let daysLeft: number | null = null;
@@ -219,7 +228,7 @@ export function deriveOverview(input: OverviewInputs): Overview {
       sprint: s,
       phase: s.state,
       issues: inIt,
-      tasks: live.filter((t) => t.sprintId === s.id && !t.issueKey),
+      tasks: live.filter((t) => t.sprintId === s.id && loose(t)),
       points,
       daysLeft,
       days,
@@ -390,7 +399,7 @@ export function deriveOverview(input: OverviewInputs): Overview {
   // Meetings.
   const events = input.events
     .filter((e) => e.status === "planned")
-    .sort((a, b) => (a.at === null ? 1 : b.at === null ? -1 : a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+    .sort((a, b) => (a.at === null ? 1 : b.at === null ? -1 : compareMoments(a.at, b.at)))
     .map((e) => ({ ...e, agenda: input.agendaByEvent(e.id) }));
   for (const e of input.events) refs[`event:${e.id}`] = `E-${e.number}`;
   for (const e of events) {
@@ -401,9 +410,10 @@ export function deriveOverview(input: OverviewInputs): Overview {
       signals.push({ id: `park-${e.id}`, level: "info", subject: e.title, text: "No date set", next: `Agreed but not booked${open ? `, with ${plural(open, "point")} waiting` : ""}.`, say: null, ref, date: null });
       continue;
     }
-    const days = diffDays(today, datePart(e.at));
+    const on = dateIn(e.at) ?? datePart(e.at);
+    const days = diffDays(today, on);
     if (days < 0) {
-      signals.push({ id: `passed-${e.id}`, level: "warning", subject: e.title, text: "Date passed", next: "Record that it happened, or give it a new date.", say: null, ref, date: datePart(e.at) });
+      signals.push({ id: `passed-${e.id}`, level: "warning", subject: e.title, text: "Date passed", next: "Record that it happened, or give it a new date.", say: null, ref, date: on });
     } else if (days <= 3) {
       signals.push({
         id: `soon-${e.id}`,
@@ -413,14 +423,14 @@ export function deriveOverview(input: OverviewInputs): Overview {
         next: open ? `${plural(open, "point")} to raise.` : "Nothing on the agenda yet.",
         say: `What should I raise at "${e.title}"?`,
         ref,
-        date: datePart(e.at),
+        date: on,
       });
     }
   }
 
   signals.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level] || (a.date ?? "9999").localeCompare(b.date ?? "9999") || a.subject.localeCompare(b.subject));
 
-  const inbox = mine.filter((v) => v.fresh && v.issue.statusCategory !== "done").sort((a, b) => b.issue.updated.localeCompare(a.issue.updated));
+  const inbox = mine.filter((v) => v.fresh && v.issue.statusCategory !== "done").sort((a, b) => compareMoments(b.issue.updated, a.issue.updated));
 
   return {
     today,
@@ -433,7 +443,7 @@ export function deriveOverview(input: OverviewInputs): Overview {
     inbox,
     issues,
     parents,
-    unplaced: live.filter((t) => !t.sprintId && !t.issueKey),
+    unplaced: live.filter((t) => !t.sprintId && loose(t)),
     events,
     signals,
     lifecycles,

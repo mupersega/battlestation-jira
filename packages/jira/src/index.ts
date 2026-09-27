@@ -9,10 +9,10 @@
  */
 
 import {
+  dateIn,
   isIssueKey,
   richTextToPlain,
   statusCategoryOf,
-  todayISO,
   type Battlestation,
   type IssueComment,
   type IssueLinkView,
@@ -115,7 +115,7 @@ export class JiraClient {
       }
       if (res.status === 429 && attempt < RETRIES) {
         const after = Number(res.headers.get("Retry-After"));
-        await this.sleep(Math.max(Number.isFinite(after) ? after * 1000 : 0, 2000 * 2 ** attempt) * (0.7 + Math.random() * 0.6));
+        await this.sleep(Math.max(Number.isFinite(after) ? after * 1000 : 0, 2000 * 2 ** attempt * (0.7 + Math.random() * 0.6)));
         continue;
       }
       if (res.status === 401) throw new JiraError("Jira did not accept the credentials (401). Check the email and token, or the personal access token.", 401);
@@ -207,11 +207,10 @@ function categoryOf(cat: Json | undefined): StatusCategory {
   return "todo";
 }
 
-/** A local calendar date for a Jira timestamp. */
-function localDate(value: unknown): string | null {
+/** The team's calendar date for a Jira timestamp. */
+function localDate(value: unknown, timeZone: string | null): string | null {
   if (typeof value !== "string" || !value || value === "<null>") return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : todayISO(d);
+  return dateIn(value, timeZone);
 }
 
 function sprintState(value: unknown): SprintState {
@@ -224,7 +223,7 @@ function sprintState(value: unknown): SprintState {
  * older Data Center gives a string such as
  * "com.atlassian.greenhopper.service.sprint.Sprint@1a2b[id=12,rapidViewId=7,state=ACTIVE,name=Sprint 12,startDate=...]".
  */
-export function parseSprintValue(value: unknown, fetchedAt: string): SprintSnapshot | null {
+export function parseSprintValue(value: unknown, fetchedAt: string, timeZone: string | null = null): SprintSnapshot | null {
   let v: Json | null = null;
   if (value && typeof value === "object") v = value as Json;
   else if (typeof value === "string") {
@@ -240,9 +239,9 @@ export function parseSprintValue(value: unknown, fetchedAt: string): SprintSnaps
     id: String(v.id),
     name: String(v.name ?? `Sprint ${v.id}`),
     state: sprintState(v.state),
-    startDate: localDate(v.startDate),
-    endDate: localDate(v.endDate),
-    completeDate: localDate(v.completeDate),
+    startDate: localDate(v.startDate, timeZone),
+    endDate: localDate(v.endDate, timeZone),
+    completeDate: localDate(v.completeDate, timeZone),
     goal: v.goal && v.goal !== "<null>" ? String(v.goal) : "",
     boardId: v.boardId !== undefined && v.boardId !== null && v.boardId !== "<null>" ? String(v.boardId) : v.originBoardId !== undefined ? String(v.originBoardId) : null,
     fetchedAt,
@@ -266,7 +265,13 @@ export interface FieldIds {
 /** The custom fields the pull needs, found in Jira's field list unless the settings name them. */
 export function findFields(fields: Json[], given: { points: string | null; sprint: string | null }, boardPoints: string | null): FieldIds {
   const byCustom = (type: string) => fields.find((f) => f.schema?.custom === type)?.id ?? null;
-  const byName = (...names: string[]) => fields.find((f) => names.some((n) => String(f.name).toLowerCase() === n.toLowerCase()))?.id ?? null;
+  const byName = (...names: string[]) => {
+    for (const n of names) {
+      const found = fields.find((f) => String(f.name).toLowerCase() === n.toLowerCase());
+      if (found) return found.id as string;
+    }
+    return null;
+  };
   return {
     points: given.points ?? boardPoints ?? byName("Story point estimate", "Story Points"),
     sprint: given.sprint ?? byCustom("com.pyxis.greenhopper.jira:gh-sprint") ?? byName("Sprint"),
@@ -348,7 +353,7 @@ export async function pullFromJira(app: Battlestation, options: PullOptions): Pr
 
   const sprints = new Map<string, SprintSnapshot>();
   if (boardId) for (const s of await client.sprints(boardId)) {
-    const parsed = parseSprintValue(s, fetchedAt);
+    const parsed = parseSprintValue(s, fetchedAt, settings.jira.timeZone);
     if (parsed) sprints.set(parsed.id, parsed);
   }
 
@@ -357,7 +362,7 @@ export async function pullFromJira(app: Battlestation, options: PullOptions): Pr
   for (const r of raw) {
     const f: Json = r.fields ?? {};
     const sprintValues: unknown[] = ids.sprint && Array.isArray(f[ids.sprint]) ? f[ids.sprint] : [];
-    const inSprints = sprintValues.map((v) => parseSprintValue(v, fetchedAt)).filter((s): s is SprintSnapshot => s !== null);
+    const inSprints = sprintValues.map((v) => parseSprintValue(v, fetchedAt, settings.jira.timeZone)).filter((s): s is SprintSnapshot => s !== null);
     // Sprints named on issues are kept too, when no board is set or the board does not list them.
     for (const s of inSprints) if (!sprints.has(s.id)) sprints.set(s.id, s);
     const ordered = [...inSprints].sort((a, b) => (a.startDate ?? "9999").localeCompare(b.startDate ?? "9999") || Number(a.id) - Number(b.id));
@@ -366,7 +371,7 @@ export async function pullFromJira(app: Battlestation, options: PullOptions): Pr
     let histories: Json[] = r.changelog?.histories ?? [];
     let started = firstStarted(histories, categories, statusCategory === "doing" ? (f.status?.name ?? null) : null);
     const truncated = typeof r.changelog?.total === "number" && r.changelog.total > histories.length;
-    if (!started && cloud && truncated && statusCategory !== "todo") {
+    if (cloud && truncated && statusCategory !== "todo") {
       histories = await client.changelog(r.key);
       started = firstStarted(histories, categories, statusCategory === "doing" ? (f.status?.name ?? null) : null);
     }
@@ -413,7 +418,19 @@ export async function pullFromJira(app: Battlestation, options: PullOptions): Pr
   // On Data Center an epic is named by key only; read the names of those not already here.
   const missing = [...epicKeys].filter((k) => isIssueKey(k) && !issues.some((i) => i.key === k));
   if (missing.length) {
-    const found = await client.search(`key in (${missing.join(",")})`, ["summary", "issuetype"], false).catch(() => []);
+    const read = (keys: string[]) => client.search(`key in (${keys.join(",")})`, ["summary", "issuetype"], false);
+    let found: Json[] = [];
+    for (let i = 0; i < missing.length; i += 50) {
+      const batch = missing.slice(i, i + 50);
+      found.push(
+        ...(await read(batch).catch(async () => {
+          const one: Json[] = [];
+          for (const k of batch) one.push(...(await read([k]).catch(() => [])));
+          return one;
+        })),
+      );
+    }
+    found = found.filter((e) => typeof e.key === "string");
     const names = new Map(found.map((e) => [e.key as string, { summary: String(e.fields?.summary ?? e.key), type: String(e.fields?.issuetype?.name ?? "Epic") }]));
     for (const i of issues) if (i.parent && names.has(i.parent.key)) i.parent = { key: i.parent.key, ...names.get(i.parent.key)! };
   }

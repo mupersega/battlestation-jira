@@ -108,3 +108,24 @@ test("a failed change leaves nothing behind", () => {
   assert.throws(() => app.upsertEvent("test", { id: "nope" }));
   assert.equal(store.audit.length, before);
 });
+
+test("a done issue that ages out of the query stays yours; an open one is released", () => {
+  const { store, app } = setup();
+  store.saveIssue(issue("ABC-2", { sprintIds: ["41"], statusCategory: "done", status: "Done", resolved: "2026-09-01T10:00:00.000+1000" }));
+  store.saveIssue(issue("ABC-3", { sprintIds: ["41"] }));
+  const t = app.upsertTask("test", { title: "Under an issue that goes", issueKey: "ABC-3" });
+  const r = app.recordPull("pull", { issues: [issue("ABC-1", { sprintIds: ["41"] })], sprints: [], me: "Me" });
+  assert.deepEqual(r.released, ["ABC-3"]);
+  assert.equal(store.getIssue("ABC-2")?.assignedToMe, true);
+  const o = app.getOverview();
+  assert.ok(o.sprints.find((s) => s.sprint.id === "41")!.tasks.some((x) => x.id === t.id), "its tasks stay in view");
+});
+
+test("settings: an empty field is no setting, and a time zone must be real", () => {
+  const { app } = setup();
+  const s = app.updateSettings("test", { jira: { pointsField: "", boardId: " ", timeZone: "Australia/Brisbane" } });
+  assert.equal(s.jira.pointsField, null);
+  assert.equal(s.jira.boardId, null);
+  assert.equal(s.jira.timeZone, "Australia/Brisbane");
+  assert.throws(() => app.updateSettings("test", { jira: { timeZone: "Mars/Olympus" } }), /time zone/);
+});

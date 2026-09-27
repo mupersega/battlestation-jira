@@ -135,7 +135,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
       if (a.where === "backlog") list = o.backlog;
       else if (a.where) {
         const id = a.where === "active" ? o.activeSprintId : a.where === "next" ? (o.sprints.find((s) => s.phase === "future")?.sprint.id ?? null) : a.where;
-        list = list.filter((v) => currentSprintId(v.issue) === id);
+        list = id === null ? [] : list.filter((v) => currentSprintId(v.issue) === id);
       }
       if (a.status) list = list.filter((v) => v.issue.statusCategory === a.status);
       return text(list.length ? list.map(issueLine).join("\n") : "(none)");
@@ -290,6 +290,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
         jql: z.string().optional().describe("which issues are read; empty for your own, open or recently resolved"),
         points_field: z.string().nullable().optional(),
         sprint_field: z.string().nullable().optional(),
+        time_zone: z.string().nullable().optional().describe("the team's time zone, such as Australia/Brisbane; the machine's when not set"),
         capacity_points: z.number().nullable().optional(),
         stale_after_days: z.number().int().optional(),
         task_types: z.array(z.string()).optional(),
@@ -302,7 +303,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
           app.updateSettings(actorOf(ctx), {
             title: a.title,
             subtitle: a.subtitle,
-            jira: { boardId: a.board_id, jql: a.jql, pointsField: a.points_field, sprintField: a.sprint_field },
+            jira: { boardId: a.board_id, jql: a.jql, pointsField: a.points_field, sprintField: a.sprint_field, timeZone: a.time_zone },
             capacityPoints: a.capacity_points,
             staleAfterDays: a.stale_after_days,
             taskTypes: a.task_types,

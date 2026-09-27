@@ -4,7 +4,7 @@
  * and whether that one is in trouble. Derived from stored facts.
  */
 
-import { compareDates, datePart, type ISODate } from "./dates.js";
+import { compareDates, datePart, dateIn, type ISODate } from "./dates.js";
 import type { IssueSnapshot, SprintSnapshot } from "./jira.js";
 import type { Event, Task } from "./types.js";
 
@@ -93,12 +93,12 @@ export function sprintLifecycle(s: SprintSnapshot, behind: boolean): Lifecycle {
 export function eventLifecycle(e: Event, today: ISODate): Lifecycle {
   const drafts: Draft[] = [
     { key: "agreed", label: "agreed", date: datePart(e.createdAt) },
-    { key: "booked", label: "booked", date: e.at ? datePart(e.at) : null },
-    { key: "happened", label: "happened", date: e.status === "done" && e.at ? datePart(e.at) : null },
+    { key: "booked", label: "booked", date: e.at ? dateIn(e.at) : null },
+    { key: "happened", label: "happened", date: e.status === "done" && e.at ? dateIn(e.at) : null },
   ];
   if (e.status === "cancelled") return run(drafts, e.at ? 1 : 0, true, "cancelled");
   if (e.status === "done") return run(drafts, 3, false, "happened");
   if (!e.at) return run(drafts, 0, false, "agreed, no date yet");
-  const passed = compareDates(datePart(e.at), today) < 0;
+  const passed = compareDates(dateIn(e.at) ?? datePart(e.at), today) < 0;
   return run(drafts, 1, passed, passed ? "date passed, not recorded as happened" : "booked");
 }

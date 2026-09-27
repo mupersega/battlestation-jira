@@ -114,6 +114,8 @@ export interface JiraSettings {
   pointsField: string | null;
   /** The custom field that holds the sprint. Found by name when not set. */
   sprintField: string | null;
+  /** The team's time zone, for turning sprint start and end times into days. The machine's when not set. */
+  timeZone: string | null;
 }
 
 export interface Settings {
@@ -132,7 +134,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   title: "Battlestation",
   subtitle: "",
-  jira: { baseUrl: null, boardId: null, jql: "", pointsField: null, sprintField: null },
+  jira: { baseUrl: null, boardId: null, jql: "", pointsField: null, sprintField: null, timeZone: null },
   capacityPoints: null,
   staleAfterDays: 4,
   taskTypes: [...DEFAULT_TASK_TYPES],

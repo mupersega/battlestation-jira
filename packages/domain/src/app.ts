@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { assertISODate, todayISO, type ISODate, type ISODateTime } from "./dates.js";
+import { assertISODate, isTimeZone, todayISO, type ISODate, type ISODateTime } from "./dates.js";
 import { DomainError } from "./errors.js";
 import { currentSprintId, isIssueKey, type IssueSnapshot, type SprintSnapshot } from "./jira.js";
 import { deriveOverview, type IssueView, type Overview } from "./overview.js";
@@ -110,6 +110,13 @@ export class Battlestation {
       if (types.length === 0) throw new DomainError("There must be at least one task type.");
       patch = { ...patch, taskTypes: [...new Set(types)] };
     }
+    if (patch.jira) {
+      // An empty field is no setting at all, so that finding it by name comes back.
+      const jira = { ...patch.jira };
+      for (const k of ["boardId", "pointsField", "sprintField", "timeZone"] as const) if (typeof jira[k] === "string" && !jira[k]!.trim()) jira[k] = null;
+      if (jira.timeZone && !isTimeZone(jira.timeZone)) throw new DomainError(`Not a time zone this computer knows: ${jira.timeZone}. Use a name such as Australia/Brisbane.`);
+      patch = { ...patch, jira };
+    }
     if (patch.jira?.baseUrl) {
       let url: URL;
       try {
@@ -117,7 +124,7 @@ export class Battlestation {
       } catch {
         throw new DomainError(`Not an address: ${patch.jira.baseUrl}`);
       }
-      if (url.protocol !== "https:" && url.hostname !== "localhost") throw new DomainError("The Jira address must start with https://.");
+      if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") throw new DomainError("The Jira address must start with https://.");
       patch = { ...patch, jira: { ...patch.jira, baseUrl: url.origin + url.pathname.replace(/\/+$/, "") } };
     }
     return this.mutate(actor, "update_settings", "settings", () => {
@@ -343,9 +350,11 @@ export class Battlestation {
 
   /**
    * Keep what a pull read. Issues and sprints are replaced by their newer
-   * copies. An issue that was yours and did not come back in this pull is
-   * kept, marked as no longer assigned to you: it may have been reassigned,
-   * or fallen outside the query, and either way it is not yours to plan.
+   * copies. An open issue that was yours and did not come back is kept,
+   * marked as no longer assigned to you: it may have been reassigned, or
+   * fallen outside the query, and either way it is not yours to plan. A done
+   * one that did not come back has most likely aged out of the query, and
+   * stays yours, so the sprints it was done in keep their numbers.
    */
   recordPull(actor: string, input: { issues: IssueSnapshot[]; sprints: SprintSnapshot[]; me: string | null; at?: ISODateTime }): PullResult {
     return this.mutate(actor, "pull", "jira", () => {
@@ -364,7 +373,7 @@ export class Battlestation {
         for (const t of this.store.listTasks().filter((x) => x.issueKey === i.key && x.sprintId !== sprintId)) this.store.saveTask({ ...t, sprintId, updatedAt: this.stamp() });
       }
       for (const old of before.values()) {
-        if (seen.has(old.key) || !old.assignedToMe) continue;
+        if (seen.has(old.key) || !old.assignedToMe || old.statusCategory === "done") continue;
         this.store.saveIssue({ ...old, assignedToMe: false });
         result.released.push(old.key);
       }

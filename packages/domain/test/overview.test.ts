@@ -134,3 +134,33 @@ test("epics and parents gather their issues", () => {
   });
   assert.deepEqual(o.parents["A-100"], { key: "A-100", summary: "Checkout", type: "Epic", issueKeys: ["A-1", "A-2"] });
 });
+
+test("a closed sprint counts as done only what was done by the time it closed", () => {
+  const { store, app } = setup();
+  store.saveIssue(issue("T-20", { sprintIds: ["40"], statusCategory: "done", points: 5, resolved: "2026-10-09T10:00:00.000+1000" }));
+  store.saveIssue(issue("T-21", { sprintIds: ["40"], statusCategory: "done", points: 2, resolved: "2026-10-01T10:00:00.000+1000" }));
+  const s40 = app.getOverview().sprints[0];
+  assert.deepEqual([s40.points.done, s40.points.todo], [2, 5]);
+});
+
+test("with a board set, another board's sprint is never the one under way", () => {
+  const { store, app } = setup();
+  store.saveSettings({ ...store.getSettings(), jira: { ...store.getSettings().jira, boardId: "7" } });
+  store.saveSprint(sprint("90", { state: "active", startDate: "2026-09-28", endDate: "2026-10-23", boardId: "9", name: "Design 3" }));
+  assert.equal(app.getOverview().activeSprintId, "41");
+});
+
+test("changed since seen is judged by the moment, not by how it was written", () => {
+  const { store, app } = setup();
+  store.saveIssue(issue("T-30", { updated: "2026-10-25T02:50:00.000+0200" }));
+  app.markSeen("test", ["T-30"]);
+  store.saveIssue(issue("T-30", { updated: "2026-10-25T02:10:00.000+0100" }));
+  assert.deepEqual(app.getOverview().inbox.map((v) => v.issue.key), ["T-30"]);
+});
+
+test("meetings are in the order they happen, whatever offset they were written with", () => {
+  const { app } = setup();
+  app.upsertEvent("test", { title: "Later", at: "2026-10-15T22:00:00Z" });
+  app.upsertEvent("test", { title: "Earlier", at: "2026-10-16T07:00:00+10:00" });
+  assert.deepEqual(app.getOverview().events.map((e) => e.title), ["Earlier", "Later"]);
+});
