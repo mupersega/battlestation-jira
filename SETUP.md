@@ -13,7 +13,7 @@ If you use Claude Code, open it in the cloned folder and ask it to set this comp
 ## 1. Install and build
 
 ```
-git clone <this repository>
+git clone https://github.com/mupersega/battlestation-jira.git
 cd battlestation-jira
 npm install
 npm run build:web
