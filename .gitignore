@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.angular/
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-*
+.env
+/data/
+apps/web/.angular/
+apps/web/.vscode/
+apps/web/public/masks/

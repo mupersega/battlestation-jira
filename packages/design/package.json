@@ -1,0 +1,15 @@
+{
+  "name": "@battlestation/design",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design tokens, themes, utility classes and base components. Generated CSS; tokens are defined once in src/tokens.mjs.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "exports": {
+    "./index.css": "./dist/index.css",
+    "./tokens.json": "./dist/tokens.json"
+  },
+  "files": ["dist"]
+}

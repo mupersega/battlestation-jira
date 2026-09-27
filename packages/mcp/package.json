@@ -1,0 +1,25 @@
+{
+  "name": "@battlestation/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Battlestation's MCP server: the agent interface over the domain service. Stdio transport.",
+  "type": "module",
+  "main": "dist/src/server.js",
+  "types": "dist/src/server.d.ts",
+  "bin": {
+    "battlestation-mcp": "dist/src/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/server.d.ts",
+      "default": "./dist/src/server.js"
+    }
+  },
+  "dependencies": {
+    "@battlestation/data": "*",
+    "@battlestation/domain": "*",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.6.5",
+    "@battlestation/jira": "*"
+  }
+}

@@ -1,0 +1,151 @@
+
+/* === Primitives: what a line used to do, without the line ===
+
+   None of them draws a border. */
+
+/* plate: a step in surface tone separates one region from the next. */
+.plate-1 { background-color: color-mix(in srgb, var(--black) 50%, transparent); }
+.plate-2 { background-color: color-mix(in srgb, var(--medium) 9%, transparent); }
+.plate-3 { background-color: color-mix(in srgb, var(--medium) 17%, transparent); }
+
+/* well: a recessed field. */
+.well {
+  background-color: var(--darker);
+  box-shadow: var(--shadow-sm-inset);
+}
+
+/* wash: a colour fading across an item says what state it is in. */
+.wash {
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--t) 26%, transparent), color-mix(in srgb, var(--t) 7%, transparent) 46%, color-mix(in srgb, var(--t) 3%, transparent));
+}
+
+/* ink: a painted shape behind something, in that thing's colour. Texture
+   goes behind words as one solid shape, never as a pattern across them.
+   Pick the shape with ink-stroke-a and so on. */
+.ink {
+  position: absolute;
+  inset: 0;
+  background-color: var(--t, var(--medium));
+  mask: var(--laid, var(--mask) center / 100% 100% no-repeat);
+  pointer-events: none;
+}
+
+/* ground: the texture of the whole screen. One painted floor that covers
+   it and one fine grain that repeats, both laid on faintly. Everything else
+   is a see-through plate over them, so the texture runs under all of it. */
+.ground,
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* The ground answers the pointer as a surface a long way behind the
+   screen would: it leans and slides a very little, and slowly. */
+.ground {
+  inset: -2%;
+  transform: perspective(1800px) rotateY(calc(var(--px, 0) * 0.7deg)) rotateX(calc(var(--py, 0) * -0.7deg)) translate(calc(var(--px, 0) * -9px), calc(var(--py, 0) * -7px));
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ground {
+    transform: none;
+  }
+}
+
+.ground {
+  background-color: color-mix(in srgb, var(--t, var(--medium)) var(--ground-strength), transparent);
+  mask: var(--shape-ground-1) center / cover no-repeat;
+}
+
+.grain {
+  background-color: color-mix(in srgb, var(--white) 3%, transparent);
+  mask: url("/masks/grain-a.png") 0 0 / 256px 256px repeat;
+}
+
+/* dab: a button is a press of paint, not a box. The paint is the element's
+   own ground, in the colour --ink, and the shape is --dab. Setting --ink is
+   how a state changes the colour. */
+.dab {
+  position: relative;
+  isolation: isolate;
+  background: none;
+}
+
+.dab::before {
+  content: '';
+  position: absolute;
+  inset: -5px calc(var(--reach) * -1);
+  z-index: -1;
+  background-color: var(--ink, var(--primary));
+  mask: var(--dab, var(--mask-button-1));
+  pointer-events: none;
+  transition: background-color var(--motion-base);
+}
+
+/* ink-under: the same, as a dark translucent stain in the back of a card.
+   The shape keeps its proportions and is cut off by the card's edge, so
+   the card needs clip. */
+.ink-under {
+  background-color: color-mix(in srgb, var(--black) 58%, transparent);
+  mask: var(--mask) center / 100% 100% no-repeat;
+  mask-size: auto 190%;
+  mask-position: right center;
+}
+
+/* quiet: something not yet decided is simply fainter. */
+.quiet {
+  opacity: 0.6;
+}
+
+/* glow: selected or focused. */
+.glow {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--t, var(--primary)) 50%, transparent);
+}
+
+/* Arriving. A thing that appears comes in from the edge it belongs to,
+   and things that arrive together arrive one after another: --i is a
+   thing's place in the line. paint-in is for ink: the stroke is laid from
+   left to right. */
+@keyframes slide-in-left { from { opacity: 0; transform: translateX(-22px); } }
+@keyframes slide-in-right { from { opacity: 0; transform: translateX(22px); } }
+@keyframes slide-in-up { from { opacity: 0; transform: translateY(16px); } }
+@keyframes slide-in-down { from { opacity: 0; transform: translateY(-16px); } }
+@keyframes paint-in { from { opacity: 0; transform: scaleX(0.2); } }
+
+.slide-in-left,
+.slide-in-right,
+.slide-in-up,
+.slide-in-down,
+.paint-in {
+  animation-duration: var(--motion-slide);
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.25, 1);
+  animation-fill-mode: backwards;
+  animation-delay: calc(min(var(--i, 0), 14) * var(--motion-step));
+}
+
+.slide-in-left { animation-name: slide-in-left; }
+.slide-in-right { animation-name: slide-in-right; }
+.slide-in-up { animation-name: slide-in-up; }
+.slide-in-down { animation-name: slide-in-down; }
+.paint-in { animation-name: paint-in; transform-origin: left center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-in-left,
+  .slide-in-right,
+  .slide-in-up,
+  .slide-in-down,
+  .paint-in {
+    animation: none;
+  }
+}
+
+/* tones: the colour a thing's state is said in. */
+.tone-success { --t: var(--success); }
+.tone-warning { --t: var(--warning); }
+.tone-danger { --t: var(--danger); }
+.tone-info { --t: var(--info); }
+.tone-primary { --t: var(--primary); }
+.tone-neutral { --t: var(--medium); }

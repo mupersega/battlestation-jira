@@ -1,0 +1,31 @@
+{
+  "name": "battlestation-jira",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A bridge for your own sprint work: your Jira issues and sprints laid out in time, with your own tasks, meetings and notes beside them. MCP-first; the web app is a second client.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "tsc -b && npm run build -w @battlestation/design",
+    "build:web": "npm run build && npm run build -w web",
+    "dev:web": "npm run start -w web",
+    "start": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning packages/api/dist/src/index.js",
+    "start:mcp": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning packages/mcp/dist/src/index.js",
+    "test": "npm run build && node --test --no-warnings=ExperimentalWarning \"packages/*/dist/test/*.test.js\"",
+    "clean": "rimraf packages/*/dist packages/*/tsconfig.tsbuildinfo apps/web/dist",
+    "mock": "node --no-warnings=ExperimentalWarning packages/api/dist/src/mock.js",
+    "pull": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning packages/jira/dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/node": "^24.19.0",
+    "node": "^24.21.0",
+    "typescript": "~6.0.3"
+  }
+}

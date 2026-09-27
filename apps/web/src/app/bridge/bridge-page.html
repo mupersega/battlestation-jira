@@ -1,0 +1,597 @@
+@if (api.overview.error()) {
+  <div class="down">
+    <p>The Battlestation server is not answering.</p>
+    <p class="quiet">Start it with <code>npm start</code>, or <code>npm run mock</code> for the invented sprint, then reload.</p>
+  </div>
+} @else if (overview(); as o) {
+  <i class="ground" appTilt="parent"></i>
+  <i class="grain"></i>
+  <header class="top slide-in-down">
+    <div class="id">
+      <i class="ink slide-in-left ink-title-1"></i>
+      <button type="button" class="name" (click)="pick({ type: 'board', id: 'board' })" title="The board and its settings">{{ o.title }}</button>
+      <span class="client">{{ o.subtitle }}</span>
+    </div>
+
+    @if (gauge(); as g) {
+      <button type="button" class="res" (click)="flyTo(g.ref)" [title]="'Your points in ' + g.name + ': done, in progress and to do' + (g.capacity !== null ? ', against a capacity of ' + g.capacity : '')">
+        <span class="res-bar" [class.over]="g.over">
+          <i class="paid" [style.width.%]="g.done.w"></i>
+          <i class="waiting" [style.width.%]="g.doing.w"></i>
+          <i class="todo" [style.width.%]="g.todo.w"></i>
+          @if (g.expectedAt !== null) {
+            <b class="expected" [style.left.%]="g.expectedAt" title="Where a straight line from start to finish says done should be by now"></b>
+          }
+          @if (g.capacityAt !== null) {
+            <b class="capacity" [style.left.%]="g.capacityAt" title="Your capacity"></b>
+          }
+        </span>
+        <span class="res-nums">
+          <span class="sprint-name">{{ g.name }}</span>
+          <span class="paid"><b>{{ g.done.v }}</b> done</span>
+          <span class="waiting"><b>{{ g.doing.v }}</b> in progress</span>
+          <span><b>{{ g.todo.v }}</b> to do</span>
+          @if (g.unestimated) {
+            <span class="late"><b>{{ g.unestimated }}</b> unestimated</span>
+          }
+          <span class="of" [class.bad]="g.over">of {{ g.committed }}{{ g.capacity !== null ? ', capacity ' + g.capacity : '' }}</span>
+        </span>
+      </button>
+      @if (g.daysLeft !== null) {
+        <div class="gauge" [class.over]="g.behind" [attr.title]="g.behind ? 'Behind a straight line from start to finish' : 'How much of the sprint has gone'">
+          <span class="k">working days left</span>
+          <span class="v">{{ g.daysLeft }}</span>
+          <span class="bar"><i [style.width.%]="g.elapsed"></i></span>
+        </div>
+      }
+      <div class="gauge" title="Points done a sprint, over the last three closed">
+        <span class="k">velocity</span>
+        <span class="v">{{ g.velocity ?? 'none yet' }}</span>
+      </div>
+    }
+
+    <div class="clock">{{ clock() }}</div>
+
+    <div class="tools">
+      <div class="themes" role="group" aria-label="Theme">
+        @for (t of look.themes; track t.id) {
+          <button type="button" [style.--swatch]="t.primary" [attr.aria-pressed]="look.theme() === t.id" [attr.aria-label]="t.label" [title]="t.label" (click)="look.theme.set(t.id)"></button>
+        }
+      </div>
+      <div class="textures" role="group" aria-label="Texture">
+        @for (x of look.textures; track x.id) {
+          <button type="button" [attr.data-texture]="x.id" [attr.aria-pressed]="look.texture() === x.id" [attr.aria-label]="x.label" [title]="x.label + ', ' + x.note" (click)="look.texture.set(x.id)"></button>
+        }
+      </div>
+      <div class="faces" role="group" aria-label="Face">
+        @for (f of look.fonts; track f.id) {
+          <button type="button" [style.font-family]="f.family" [attr.aria-pressed]="look.font() === f.id" [attr.aria-label]="f.label" [title]="f.label + ', ' + f.note" (click)="look.font.set(f.id)">Aa</button>
+        }
+      </div>
+      <button type="button" class="tool" (click)="api.reload()">Reload</button>
+    </div>
+  </header>
+
+  <ng-template #row let-s let-i="i">
+    <button type="button" appTilt [class]="'sig slide-in-left tone-' + s.tone" [class.on]="s.on" [style.--i]="i" (click)="flyTo(s.ref)">
+      <i class="ink ink-under"></i>
+      <span class="sig-top">
+        <span class="ref"><i class="slant"></i><app-icon [name]="s.icon" />{{ s.badge }}</span>
+        <span class="sig-subject">{{ s.subject }}</span>
+      </span>
+      <span class="sig-text">{{ s.text }}</span>
+      @if (s.life; as life) {
+        <span class="pips" [attr.title]="life.now">
+          @for (st of life.stages; track st.key) {
+            <i [class]="st.state"></i>
+          }
+        </span>
+      }
+    </button>
+  </ng-template>
+
+  <aside class="left" aria-label="What wants you">
+    <section class="zone">
+      <h2 class="zone-head tone-primary" title="Issues in progress, and your own tasks you have started."><i class="ink paint-in ink-head-1"></i>
+        <app-icon name="hand" /><span>In hand</span><b>{{ work().length }}</b>
+        <button type="button" class="pull" (click)="newTask()" title="Write a task of your own. It goes under whatever is selected, if that can hold one.">New task</button>
+      </h2>
+      @for (s of work(); track s.id) {
+        <ng-container *ngTemplateOutlet="row; context: { $implicit: s, i: $index }" />
+      } @empty {
+        <p class="zone-note">Nothing in progress.</p>
+      }
+    </section>
+
+    <section class="zone">
+      <h2 class="zone-head tone-warning" title="Conditions worked out from what Jira says and what you have recorded, not messages. Each goes by itself once the thing is dealt with."><i class="ink paint-in ink-head-2"></i><app-icon name="alert" /><span>Needs you</span><b>{{ needs().length }}</b></h2>
+      @for (s of needs(); track s.id) {
+        <ng-container *ngTemplateOutlet="row; context: { $implicit: s, i: $index }" />
+      } @empty {
+        <p class="zone-note">Nothing. Each of these goes by itself once the thing is dealt with.</p>
+      }
+    </section>
+
+    <section class="zone">
+      <h2 class="zone-head tone-info" title="Issues of yours that are new, or have changed in Jira since you last looked."><i class="ink paint-in ink-head-3"></i>
+        <app-icon name="inbox" /><span>New to you</span><b>{{ inbox().length }}</b>
+        @if (inbox().length) {
+          <button type="button" class="pull" [disabled]="saving()" (click)="seen('all')" title="Mark them all as seen as they are now">All seen</button>
+        } @else if (live()) {
+          <button type="button" class="pull" [disabled]="pulling()" (click)="pull()" title="Read your issues from Jira again. Nothing is written to Jira.">{{ pulling() ? 'Reading' : 'Pull' }}</button>
+        }
+      </h2>
+      <p class="zone-note">
+        @if (!inbox().length) {
+          Nothing new.
+        }
+        @if (pullSaid(); as p) {
+          <span [class.bad]="!p.ok">{{ p.said }}.</span>
+        } @else if (pulledAt(); as at) {
+          Read from Jira {{ at }}.
+        } @else {
+          Never read from Jira.
+        }
+      </p>
+      @for (t of inbox(); track t.key) {
+        <button type="button" appTilt [class]="'tk slide-in-left tone-' + t.tone" [class.on]="t.on" [style.--i]="$index" (click)="flyTo(t.ref)">
+          <span class="ref"><i class="slant"></i><app-icon name="issue" />{{ t.key }}</span>
+          <span class="tk-t">{{ t.title }}</span>
+          <span class="tk-w">{{ t.status }}</span>
+        </button>
+      }
+    </section>
+
+    <section class="zone">
+      <h2 class="zone-head tone-neutral" title="Your meetings, soonest first."><i class="ink paint-in ink-head-2"></i>
+        <app-icon name="event" /><span>Meetings</span><b>{{ meetings().length }}</b>
+        <button type="button" class="pull" (click)="newMeeting()" title="Put a meeting on the map">New meeting</button>
+      </h2>
+      @for (m of meetings(); track m.ref.id) {
+        <button type="button" appTilt class="tk done slide-in-left" [class.on]="m.on" [style.--i]="$index" (click)="flyTo(m.ref)">
+          <span class="ref"><i class="slant"></i><app-icon name="event" />{{ m.badge }}</span>
+          <span class="tk-t">{{ m.title }}</span>
+          <span class="tk-w">{{ m.when }}{{ m.open ? ', ' + m.open + ' to raise' : '' }}</span>
+        </button>
+      } @empty {
+        <p class="zone-note">None planned.</p>
+      }
+    </section>
+  </aside>
+
+  <section class="center">
+    <div class="axis" aria-hidden="true">
+      @for (t of ticks(); track t.day) {
+        <span class="tick" [class.major]="t.major" [style.left.px]="t.x">{{ t.label }}</span>
+      }
+      <span class="now-tab" [style.left.px]="todayX()"><span>{{ formatDay(o.today) }}</span></span>
+    </div>
+
+    <div class="map" #mapBox (wheel)="onWheel($event)" (pointerdown)="onDown($event)" (pointermove)="onMove($event)" (pointerup)="onUp($event)" (pointercancel)="onUp($event)">
+      @if (scene(); as s) {
+        <svg class="chart" [attr.width]="width()" [style.height.px]="s.height" role="group" aria-label="Your sprints laid out in time">
+          <defs>
+            <linearGradient id="beam" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="var(--primary)" stop-opacity="0" />
+              <stop offset="0.5" stop-color="var(--primary)" stop-opacity="0.34" />
+              <stop offset="1" stop-color="var(--primary)" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+
+          @for (k of weeks(); track k.day) {
+            <rect class="week" [class.odd]="k.odd" [attr.x]="k.x" y="0" [attr.width]="k.w" height="100%" />
+          }
+          @for (z of zones(); track z.key) {
+            <rect [class]="'zone-band ' + (z.phase === 'active' ? 'current' : z.phase === 'future' ? 'upcoming' : 'closed')" [class.on]="z.on" [attr.x]="z.x" y="0" [attr.width]="z.w" height="100%" />
+          }
+          <rect class="past" x="0" y="0" [attr.width]="todayX() > 0 ? todayX() : 0" height="100%" />
+
+          @for (it of drawn(); track it.key) {
+            <g
+              [class]="it.cls"
+              tabindex="0"
+              role="button"
+              [attr.aria-label]="it.title"
+              (click)="pick(it.ref, $event)"
+              (keydown.enter)="pick(it.ref)"
+              (pointerenter)="hover(it)"
+              (pointerleave)="hover(null)"
+              (focus)="hover(it)"
+              (blur)="hover(null)"
+            >
+              @switch (it.shape) {
+                @case ('band') {
+                  <polygon [attr.points]="it.pts" />
+                }
+                @case ('flag') {
+                  <polygon [attr.points]="it.pts" />
+                }
+                @case ('outline') {
+                  <rect [attr.x]="it.x" [attr.y]="it.y" [attr.width]="it.w" [attr.height]="it.h" rx="1.5" />
+                }
+                @case ('dot') {
+                  <circle [attr.cx]="it.x" [attr.cy]="it.y + it.h / 2" r="5" />
+                }
+                @case ('diamond') {
+                  <rect [attr.x]="it.x - 5" [attr.y]="it.y" width="10" height="10" [attr.transform]="'rotate(45 ' + it.x + ' ' + (it.y + 5) + ')'" />
+                }
+                @case ('pip') {
+                  <rect [attr.x]="it.x - 5" [attr.y]="it.y" width="10" height="10" rx="1.5" />
+                }
+                @default {
+                  <rect [attr.x]="it.x" [attr.y]="it.y" [attr.width]="it.w" [attr.height]="it.h" rx="1.5" />
+                }
+              }
+              @if (it.label) {
+                <text [attr.x]="it.lx" [attr.y]="it.ly">{{ it.label }}</text>
+              }
+            </g>
+          }
+
+          @for (l of rowLabels(); track l.key) {
+            <g [class]="l.cls" tabindex="0" role="button" [attr.aria-label]="l.text" (click)="pick(l.ref, $event)" (keydown.enter)="pick(l.ref)">
+              <rect [attr.x]="l.x" [attr.y]="l.y - 9" width="9" height="9" rx="1" />
+              <text [attr.x]="l.x + 15" [attr.y]="l.y">{{ l.text }}</text>
+            </g>
+          }
+
+          <rect class="beam" [attr.x]="todayX() - 11" y="0" width="22" height="100%" />
+          <rect class="now" [attr.x]="todayX() - 1" y="0" width="2" height="100%" />
+        </svg>
+      }
+    </div>
+
+    <div class="controls">
+      <button type="button" (click)="now()" title="Back to today (n)">Today</button>
+      <button type="button" (click)="fit()" title="Everything (f)">All</button>
+      <button type="button" (click)="zoom(0.8)" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
+      <button type="button" (click)="zoom(1.25)" title="Zoom in (+)" aria-label="Zoom in">+</button>
+      <span class="readout">{{ readout() }}</span>
+    </div>
+  </section>
+
+  <aside class="right" aria-label="Selected">
+    @if (taskDraft(); as n) {
+      <form class="sorter" (submit)="$event.preventDefault(); saveTask()">
+        <p class="kind"><app-icon name="task" /><span>A task of your own</span></p>
+        <label>
+          <span>Called</span>
+          <input type="text" [value]="n.title" (input)="editTask('title', value($event))" />
+        </label>
+        <label>
+          <span>Under</span>
+          <select (change)="editTask('place', value($event))">
+            @for (p of places(); track p.value) {
+              <option [value]="p.value" [selected]="p.value === n.place">{{ p.label }}</option>
+            }
+          </select>
+        </label>
+        @if (o.taskTypes.length > 1) {
+          <label>
+            <span>Kind</span>
+            <select (change)="editTask('type', value($event))">
+              @for (t of o.taskTypes; track t) {
+                <option [value]="t" [selected]="t === n.type">{{ t }}</option>
+              }
+            </select>
+          </label>
+        }
+        <label>
+          <span>What has to be done, and how to tell it is done</span>
+          <textarea rows="5" [value]="n.description" (input)="editTask('description', value($event))" placeholder="Can be filled in later."></textarea>
+        </label>
+        @if (refused(); as why) {
+          <p class="refused" role="alert">{{ why }}</p>
+        }
+        <div class="actions">
+          <button type="submit" class="save" [disabled]="saving()">{{ saving() ? 'Saving' : 'Add the task' }}</button>
+          <button type="button" class="undo" (click)="taskDraft.set(null)">Put it down</button>
+        </div>
+      </form>
+    } @else if (meetingDraft(); as m) {
+      <form class="sorter" (submit)="$event.preventDefault(); saveMeeting()">
+        <p class="kind"><app-icon name="event" /><span>A meeting</span></p>
+        <label>
+          <span>Called</span>
+          <input type="text" [value]="m.title" (input)="editMeeting('title', value($event))" />
+        </label>
+        <label>
+          <span>Kind</span>
+          <select (change)="editMeeting('kind', value($event))">
+            @for (k of kinds; track k.id) {
+              <option [value]="k.id" [selected]="k.id === m.kind">{{ k.label }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span>When, in your own time. Leave it empty if it is not booked yet.</span>
+          <input type="datetime-local" [value]="m.when" (input)="editMeeting('when', value($event))" />
+        </label>
+        @if (refused(); as why) {
+          <p class="refused" role="alert">{{ why }}</p>
+        }
+        <div class="actions">
+          <button type="submit" class="save" [disabled]="saving()">{{ saving() ? 'Saving' : 'Add the meeting' }}</button>
+          <button type="button" class="undo" (click)="meetingDraft.set(null)">Put it down</button>
+        </div>
+      </form>
+    } @else {
+      <!-- Made again for each thing selected, so that each one arrives. -->
+      @for (d of shown(); track d.ref.type + ':' + d.ref.id) {
+      <div appTilt [class]="'card tone-' + d.tone">
+        <i class="ink ink-under ink-stain-1"></i>
+        <p class="kind">
+          @if (d.badge) {
+            <span class="ref"><i class="slant"></i><app-icon [name]="d.icon" />{{ d.badge }}</span>
+          } @else {
+            <app-icon [name]="d.icon" />
+          }
+          <span>{{ d.kind }}</span>
+        </p>
+        <h1>{{ d.title }}</h1>
+        <p class="state">{{ d.state }}</p>
+        @if (d.life; as life) {
+          <ol class="life">
+            @for (st of life.stages; track st.key) {
+              <li [class]="st.state">
+                <i></i>
+                <span>{{ st.label }}</span>
+                @if (st.date) {
+                  <em>{{ formatDay(st.date) }}</em>
+                }
+              </li>
+            }
+          </ol>
+        }
+      </div>
+
+      @if (d.next) {
+        <div class="next">
+          <p>{{ d.next }}</p>
+          @if (d.say; as say) {
+            <button type="button" class="say" (click)="copy(say)" title="Copy, then give it to an agent">
+              <span>{{ say }}</span>
+              <em>{{ copied() ? 'copied' : 'copy' }}</em>
+            </button>
+          }
+        </div>
+      }
+
+      @if (d.issue; as i) {
+        <div class="actions">
+          @if (d.jira) {
+            <a class="pdf" [href]="d.jira" target="_blank" rel="noopener">Open in Jira</a>
+          }
+          @if (i.fresh) {
+            <button type="button" class="save" [disabled]="saving()" (click)="seen([i.key])">Seen</button>
+          }
+        </div>
+      }
+
+      @if (d.task; as t) {
+        <div class="actions">
+          @switch (t.status) {
+            @case ('todo') {
+              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'doing')">Start it</button>
+            }
+            @case ('doing') {
+              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'done')">Finish it</button>
+              <button type="button" class="undo" [disabled]="saving()" (click)="move(t.id, 'todo')">Put it back in the queue</button>
+            }
+            @case ('blocked') {
+              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'doing')">Back in hand</button>
+            }
+            @case ('done') {
+              <button type="button" class="undo" [disabled]="saving()" (click)="move(t.id, 'doing')">Not finished after all</button>
+            }
+          }
+          @if (refused(); as why) {
+            <span class="refused" role="alert">{{ why }}</span>
+          }
+        </div>
+      }
+
+      @if (d.meeting; as m) {
+        <form class="sorter" (submit)="$event.preventDefault(); setDate(m.id)">
+          <label>
+            <span>When, in your own time</span>
+            <input type="datetime-local" [value]="when()" (input)="when.set(value($event))" />
+          </label>
+          <div class="actions">
+            <button type="submit" class="save" [disabled]="saving()">{{ m.at ? 'Change the date' : 'Set the date' }}</button>
+            @if (m.at) {
+              <button type="button" class="undo" [disabled]="saving()" (click)="happened(m.id, d.title)">It happened</button>
+            }
+          </div>
+        </form>
+      }
+
+      @if (d.body.length) {
+        <div class="body rt">
+          @for (line of d.body; track $index) {
+            @switch (line.kind) {
+              @case ('gap') {
+                <span class="rt-gap"></span>
+              }
+              @default {
+                <span class="rt-line" [class.rt-item]="line.kind === 'item'">
+                  @if (line.marker) {
+                    <span class="rt-mark">{{ line.marker }}</span>
+                  }
+                  <span>
+                    @for (s of line.spans; track $index) {
+                      @if (s.code) {
+                        <code>{{ s.text }}</code>
+                      } @else if (s.bold) {
+                        <strong>{{ s.text }}</strong>
+                      } @else {
+                        {{ s.text }}
+                      }
+                    }
+                  </span>
+                </span>
+              }
+            }
+          }
+        </div>
+      }
+
+      @if (d.facts.length) {
+        <dl class="facts">
+          @for (f of d.facts; track $index) {
+            <div [class]="f.tone ? 'tone-' + f.tone : ''">
+              <dt>{{ f.k }}</dt>
+              <dd>{{ f.v }}</dd>
+            </div>
+          }
+        </dl>
+      }
+
+      @if (d.issue; as i) {
+        <form class="sorter" (submit)="$event.preventDefault(); saveNote(i.key)">
+          <label>
+            <span>Your note. It stays here and is never sent to Jira.</span>
+            <textarea rows="3" [value]="note()" (input)="note.set(value($event))" placeholder="What you want to remember about it."></textarea>
+          </label>
+          @if (refused(); as why) {
+            <p class="refused" role="alert">{{ why }}</p>
+          }
+          <div class="actions">
+            <button type="submit" class="save" [disabled]="saving() || note() === i.note">Keep the note</button>
+          </div>
+        </form>
+      }
+
+      @if (d.agenda.length) {
+        <ol class="agenda">
+          @for (a of d.agenda; track a.id) {
+            <li [class.done]="!a.open">
+              <p>{{ a.text }}</p>
+              @if (a.answer) {
+                <q>{{ a.answer }}</q>
+              }
+              @if (d.meeting) {
+                <button type="button" class="answer" (click)="answer(a.id, a.answer)">{{ a.answer ? 'Change the answer' : 'Answer it' }}</button>
+              }
+            </li>
+          }
+        </ol>
+      }
+
+      @if (d.meeting; as m) {
+        <form class="sorter" (submit)="$event.preventDefault(); raise(m.id)">
+          <label>
+            <span>Something to raise. Name an issue by its key to tie it to that issue.</span>
+            <textarea rows="3" [value]="point()" (input)="point.set(value($event))" placeholder="A question or a point, as you would put it."></textarea>
+          </label>
+          @if (refused(); as why) {
+            <p class="refused" role="alert">{{ why }}</p>
+          }
+          <div class="actions">
+            <button type="submit" class="save" [disabled]="saving()">Add to the agenda</button>
+          </div>
+        </form>
+      }
+
+      @if (d.settings) {
+        @if (settingsDraft(); as sd) {
+          <form class="sorter" (submit)="$event.preventDefault(); saveSettings()">
+            <label>
+              <span>Called</span>
+              <input type="text" [value]="sd.title" (input)="editSettings('title', value($event))" />
+            </label>
+            <label>
+              <span>Beside it</span>
+              <input type="text" [value]="sd.subtitle" (input)="editSettings('subtitle', value($event))" />
+            </label>
+            <label>
+              <span>Capacity, in points a sprint</span>
+              <input type="number" min="1" step="1" [value]="sd.capacity" (input)="editSettings('capacity', value($event))" />
+            </label>
+            <label>
+              <span>In progress for more working days than this is called out</span>
+              <input type="number" min="1" step="1" [value]="sd.stale" (input)="editSettings('stale', value($event))" />
+            </label>
+            <label>
+              <span>Jira address</span>
+              <input type="url" [value]="sd.site" (input)="editSettings('site', value($event))" placeholder="https://your-site.atlassian.net" />
+            </label>
+            <label>
+              <span>Board id, to change it</span>
+              <input type="text" [value]="sd.board" (input)="editSettings('board', value($event))" placeholder="The number in the board's address" />
+            </label>
+            <label>
+              <span>Which issues are read (JQL), to change it</span>
+              <input type="text" [value]="sd.jql" (input)="editSettings('jql', value($event))" placeholder="Empty reads your own, open or recently resolved" />
+            </label>
+            <p class="hint">The Jira credentials are never kept here. They are read from the .env file when a pull runs.</p>
+            @if (refused(); as why) {
+              <p class="refused" role="alert">{{ why }}</p>
+            }
+            <div class="actions">
+              <button type="submit" class="save" [disabled]="saving()">Keep the settings</button>
+              @if (live()) {
+                <button type="button" class="undo" [disabled]="pulling()" (click)="pull()">{{ pulling() ? 'Reading' : 'Pull from Jira' }}</button>
+              }
+            </div>
+          </form>
+        }
+      }
+
+      @if (d.story.length) {
+        <ol class="story">
+          @for (s of d.story; track $index) {
+            <li [class]="'tone-' + s.tone">
+              <span class="when">{{ formatDay(s.date) }}</span>
+              <span class="what">{{ s.text }}</span>
+              @if (s.quote) {
+                <q>{{ s.quote }}</q>
+              }
+            </li>
+          }
+        </ol>
+      }
+
+      @if (d.links.length) {
+        <div class="links">
+          @for (l of d.links; track $index) {
+            @if (l.ref; as r) {
+              <button type="button" appTilt [class]="'link tone-' + l.tone" (click)="flyTo(r)">
+                <span class="ref"><i class="slant"></i><app-icon [name]="l.icon" />{{ l.badge }}</span>
+                <span>{{ l.text }}</span>
+                <em>{{ l.note }}</em>
+              </button>
+            } @else {
+              <a appTilt [class]="'link tone-' + l.tone" [attr.href]="l.href" target="_blank" rel="noopener">
+                <span class="ref"><i class="slant"></i><app-icon [name]="l.icon" />{{ l.badge }}</span>
+                <span>{{ l.text }}</span>
+                <em>{{ l.note }}</em>
+              </a>
+            }
+          }
+        </div>
+      }
+      } @empty {
+        <p class="clear">Select anything on the map.</p>
+      }
+    }
+  </aside>
+
+  <footer class="mini slide-in-up" #miniBox (pointerdown)="onMini($event)" (pointermove)="onMini($event)" aria-hidden="true">
+    @if (mini(); as m) {
+      <svg [attr.width]="miniWidth()" height="44">
+        @for (z of m.zones; track z.key) {
+          <rect [class]="'mz ' + (z.phase === 'active' ? 'current' : z.phase === 'future' ? 'upcoming' : 'closed')" [attr.x]="z.x" y="8" [attr.width]="z.w" height="28" rx="1.5" />
+          <text [attr.x]="z.x + 6" y="27">{{ z.name }}</text>
+        }
+        @for (p of m.pings; track p.id) {
+          <circle [class]="'tone-' + p.tone" [attr.cx]="p.x" cy="5" r="3" />
+        }
+        <rect class="now" [attr.x]="m.today - 1" y="0" width="2" height="44" />
+        <rect class="view" [attr.x]="m.view.x" y="1" [attr.width]="m.view.w" height="42" rx="2" />
+      </svg>
+    }
+  </footer>
+} @else {
+  <div class="down"><p class="quiet">Loading.</p></div>
+}

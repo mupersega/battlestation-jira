@@ -1,0 +1,23 @@
+{
+  "name": "@battlestation/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Thin local HTTP layer over the domain service for the web UI. Also serves the built Angular app.",
+  "type": "module",
+  "main": "dist/src/server.js",
+  "types": "dist/src/server.d.ts",
+  "bin": {
+    "battlestation": "dist/src/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/server.d.ts",
+      "default": "./dist/src/server.js"
+    }
+  },
+  "dependencies": {
+    "@battlestation/data": "*",
+    "@battlestation/domain": "*",
+    "@battlestation/jira": "*"
+  }
+}

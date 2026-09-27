@@ -1,0 +1,1572 @@
+/*
+ * The bridge. No borders, no outlines, no rules between things.
+ *
+ * What a line would do is done here by one of five things:
+ *
+ *   plate   a step in surface tone separates one region from the next
+ *   wash    a colour fading across an item says what state it is in
+ *   well    a recessed field takes input
+ *   skew    a slanted plate marks a reference
+ *   ink     a painted shape sits behind a heading
+ *
+ * Under all of it is one painted ground that covers the screen. The plates
+ * are see-through, so the texture runs under everything.
+ *
+ * Something not yet decided is simply fainter: a quieter plate, quieter
+ * text. Texture goes behind words as one solid shape, never as a pattern
+ * across them, so the words stay easy to read.
+ *
+ * Two lines are kept on purpose: see the note at the end.
+ */
+
+:host {
+  --dock-l: clamp(250px, 18vw, 460px);
+  --dock-r: clamp(320px, 25vw, 640px);
+  --plate-0: var(--darkest);
+  --plate-1: color-mix(in srgb, var(--black) 50%, transparent);
+  --plate-2: color-mix(in srgb, var(--medium) 9%, transparent);
+  --plate-3: color-mix(in srgb, var(--medium) 17%, transparent);
+  --slant: -14deg;
+
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--dock-l) minmax(0, 1fr) var(--dock-r);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top top top'
+    'left center right'
+    'left mini right';
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: none;
+  background: var(--plate-0);
+  position: relative;
+  isolation: isolate;
+}
+
+.tone-success { --t: var(--success); }
+.tone-warning { --t: var(--warning); }
+.tone-danger { --t: var(--danger); }
+.tone-info { --t: var(--info); }
+.tone-primary { --t: var(--primary); }
+.tone-neutral { --t: var(--medium); }
+
+button,
+input,
+textarea,
+select {
+  appearance: none;
+  border: 0;
+  outline: 0;
+  font: inherit;
+}
+
+button {
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+a {
+  text-decoration: none;
+}
+
+/* Focus and selection are a glow, not a ring. */
+:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 0 transparent, 0 0 12px 1px color-mix(in srgb, var(--primary) 75%, transparent);
+}
+
+.down {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  font-size: 15px;
+}
+
+/* A slanted plate behind a reference. */
+.slant {
+  position: absolute;
+  inset: 0;
+  transform: skewX(var(--slant));
+  background: color-mix(in srgb, var(--t, var(--medium)) 22%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ top */
+
+.top {
+  grid-area: top;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.4vw, 40px);
+  padding: 9px 14px;
+  background: var(--plate-1);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.id {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-right: 140px;
+  color: var(--black);
+}
+
+/* The name sits on paint the way a card sits on its wash: full colour at
+   the left, where the eye starts, breaking up into drops to the right. The
+   paint is far taller than the bar, so the bar cuts it off. */
+.id .ink {
+  inset: -70px 0 -70px -60px;
+  background-color: var(--primary);
+}
+
+.id > :not(.ink) {
+  position: relative;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--black);
+}
+
+.name:hover {
+  color: color-mix(in srgb, var(--black) 65%, transparent);
+}
+
+.client {
+  color: color-mix(in srgb, var(--black) 80%, transparent);
+  font-weight: 600;
+}
+
+/* The sprint's points across the top. The two marks are the only lines on
+   it: where a straight line says done should be by now, and capacity. */
+.res {
+  flex: 1 1 340px;
+  min-width: 340px;
+  max-width: 900px;
+  text-align: left;
+}
+
+.res:hover .res-nums {
+  color: var(--white);
+}
+
+.res-bar {
+  position: relative;
+  display: flex;
+  height: 10px;
+  padding: 1px;
+  gap: 1px;
+  background: var(--darker);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm-inset);
+}
+
+.res-bar i {
+  display: block;
+  border-radius: 1px;
+  min-width: 0;
+}
+
+.res-bar .paid { background: var(--success); }
+.res-bar .waiting { background: var(--info); }
+.res-bar .todo { background: color-mix(in srgb, var(--medium) 34%, transparent); }
+
+.res-bar b {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+}
+
+.res-bar .expected { background: var(--warning); box-shadow: 0 0 5px var(--warning); }
+.res-bar .capacity { background: var(--white); }
+.res-bar.over .capacity { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+
+.res-nums {
+  display: flex;
+  gap: 14px;
+  margin-top: 3px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--medium) 86%, transparent);
+}
+
+.res-nums b {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.res-nums .paid b { color: var(--success); }
+.res-nums .waiting b { color: var(--info); }
+.res-nums .late b { color: var(--danger); }
+.res-nums .of { margin-left: auto; }
+.res-nums .of.bad { color: var(--danger); font-weight: 700; }
+.res-nums .sprint-name { font-weight: 700; color: var(--white); }
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 70px;
+}
+
+.gauge .k {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.gauge .v {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.gauge .bar {
+  display: block;
+  width: clamp(60px, 6vw, 180px);
+  height: 8px;
+  padding: 1px;
+  background: var(--darker);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm-inset);
+}
+
+.gauge .bar i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 1px;
+  background: var(--primary);
+}
+
+.gauge.over .bar i {
+  background: var(--danger);
+}
+
+.clock {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Each theme is a splash of its colour. The one in use is the bright one. */
+.themes,
+.faces {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.themes button {
+  width: 24px;
+  height: 24px;
+  background-color: color-mix(in srgb, var(--swatch) 45%, transparent);
+  mask: var(--shape-chip-1) center / 125% 125% no-repeat;
+  transition: background-color var(--motion-base), transform var(--motion-base);
+}
+
+.themes button:nth-child(even) {
+  mask-image: var(--shape-chip-2);
+  transform: rotate(70deg);
+}
+
+.themes button:nth-child(3n) {
+  transform: rotate(-120deg);
+}
+
+.themes button:hover,
+.themes button[aria-pressed='true'] {
+  background-color: var(--swatch);
+}
+
+/* Each texture is shown as a small piece of itself. */
+.textures {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.textures button {
+  width: 22px;
+  height: 22px;
+  background-color: color-mix(in srgb, var(--medium) 40%, transparent);
+  mask: var(--shape-chip-1) center / 100% 100% no-repeat;
+  transition: background-color var(--motion-base);
+}
+
+.textures button:hover,
+.textures button[aria-pressed='true'] {
+  background-color: var(--white);
+}
+
+/* Each face is shown in itself. */
+.faces button {
+  position: relative;
+  isolation: isolate;
+  padding: 2px 7px;
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.faces button:hover {
+  color: var(--white);
+}
+
+.faces button[aria-pressed='true'] {
+  color: var(--black);
+}
+
+.faces button[aria-pressed='true']::before {
+  content: '';
+  position: absolute;
+  inset: -7px -4px;
+  z-index: -1;
+  background-color: var(--primary);
+  mask: var(--shape-chip-1) center / auto 135% no-repeat;
+}
+
+/* A button is a press of paint. Its colour is --ink; its shape is one of
+   four, given out in turn at the end of this sheet. */
+.tool,
+.pull,
+.pdf,
+.save,
+.undo {
+  position: relative;
+  isolation: isolate;
+  background: none;
+}
+
+.tool::before,
+.pull::before,
+.pdf::before,
+.save::before,
+.undo::before {
+  content: '';
+  position: absolute;
+  inset: -5px calc(var(--reach) * -1);
+  z-index: -1;
+  background-color: var(--ink);
+  mask: var(--dab);
+  pointer-events: none;
+  transition: background-color var(--motion-base);
+}
+
+.tool,
+.pull,
+.pdf {
+  --ink: color-mix(in srgb, var(--medium) 24%, var(--black));
+  padding: 4px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--light);
+  transition: color var(--motion-base);
+}
+
+.tool:hover,
+.pull:hover,
+.pdf:hover {
+  --ink: var(--primary);
+  color: var(--black);
+}
+
+/* The map's own controls stay plain plates: they are small and sit on the map. */
+.controls button {
+  padding: 4px 11px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--light);
+  background: var(--plate-3);
+  transition: background-color var(--motion-base), color var(--motion-base);
+}
+
+.controls button:hover {
+  color: var(--black);
+  background: var(--primary);
+}
+
+/* ----------------------------------------------------------------- left */
+
+.left {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 12px 10px 18px;
+  overflow-y: auto;
+  background: var(--plate-1);
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* A zone's heading sits on a brush stroke in the zone's colour. The words
+   are dark and stay on the solid middle of the stroke; its ragged ends run
+   out past them. */
+.zone-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 4px 5px;
+  padding: 5px calc(5px + var(--reach));
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--black);
+}
+
+.zone-head .ink {
+  inset: -5px -10px -5px -8px;
+  background-color: color-mix(in srgb, var(--t) 86%, var(--black));
+}
+
+.zone-head > :not(.ink) {
+  position: relative;
+}
+
+.zone-head b {
+  font-size: 13px;
+}
+
+/* A control on a stroke is dark, so that it reads on any colour of paint. */
+.zone-head .pull {
+  margin-left: auto;
+  padding: 1px 10px;
+  font-size: 11.5px;
+  --ink: color-mix(in srgb, var(--black) 86%, transparent);
+  color: var(--white);
+}
+
+.zone-note {
+  padding: 0 4px 2px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.zone-note .bad {
+  color: var(--danger);
+}
+
+.pull:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A reference on its slanted plate: an issue's key, a sprint, a task's number. */
+.ref {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.55;
+  /* Light, faintly tinted: the plate behind says the colour; the words only need to be read. */
+  color: color-mix(in srgb, var(--t, var(--light)) 32%, var(--white));
+  white-space: nowrap;
+}
+
+.ref > :not(.slant) {
+  position: relative;
+}
+
+/* An item: a wash of its colour, strongest at the left where the eye starts. */
+.sig,
+.link,
+.card,
+.tk.done {
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--t) 26%, transparent), color-mix(in srgb, var(--t) 7%, transparent) 46%, color-mix(in srgb, var(--t) 3%, transparent));
+  border-radius: 2px;
+}
+
+/* Thrown paint in the back of a card, under its words. Three shapes in
+   turn, so that neighbours differ. */
+.sig,
+.card {
+  position: relative;
+  overflow: hidden;
+}
+
+.sig > :not(.ink),
+.card > :not(.ink) {
+  position: relative;
+}
+
+.sig .ink { --mask: var(--shape-stain-1); mask-position: left center; }
+.sig:nth-child(3n + 2) .ink { --mask: var(--shape-stain-2); mask-position: 30% top; }
+.sig:nth-child(3n) .ink { --mask: var(--shape-stain-3); mask-position: 60% bottom; }
+
+/* What is selected arrives from the right, one part after another. */
+.right > * {
+  animation: slide-in-right var(--motion-slide) cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
+}
+
+.right > :nth-child(2) { animation-delay: calc(var(--motion-step) * 1); }
+.right > :nth-child(3) { animation-delay: calc(var(--motion-step) * 2); }
+.right > :nth-child(4) { animation-delay: calc(var(--motion-step) * 3); }
+.right > :nth-child(5) { animation-delay: calc(var(--motion-step) * 4); }
+.right > :nth-child(n + 6) { animation-delay: calc(var(--motion-step) * 5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .right > * {
+    animation: none;
+  }
+}
+
+.sig {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  color: var(--light);
+  transition: filter var(--motion-base);
+}
+
+.sig:hover,
+.link:hover,
+.tk:hover {
+  filter: brightness(1.3);
+}
+
+/* Under the pointer a card comes forward: it steps toward the map, leans
+   toward the pointer as a thing with depth would, the paint in it swells
+   and takes the card's colour, and a slanted sheen crosses it once. The
+   paint lies a little behind the card's face, so as the card leans the
+   paint is seen to shift: by as much as a thing 60px behind would, and in
+   step with the lean, not after it. No shadow. --px and --py are where the
+   pointer is over the card, each from -1 to 1. */
+.sig,
+.link,
+.tk {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  transition: transform var(--motion-base) cubic-bezier(0.2, 0.8, 0.25, 1), box-shadow var(--motion-base), filter var(--motion-base);
+}
+
+.sig:hover,
+.link:hover,
+.tk:hover {
+  transform: perspective(520px) translateX(6px) rotateY(calc(var(--px, 0) * 5deg)) rotateX(calc(var(--py, 0) * -7deg));
+}
+
+.card {
+  transition: transform var(--motion-base) cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.card:hover {
+  transform: perspective(900px) rotateY(calc(var(--px, 0) * 3deg)) rotateX(calc(var(--py, 0) * -3.5deg));
+}
+
+.card .ink {
+  transition: transform var(--motion-base) cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.card:hover .ink {
+  transform: scale(1.1) translate(calc(var(--px, 0) * -3px), calc(var(--py, 0) * -4px));
+}
+
+.sig:active,
+.link:active,
+.tk:active {
+  transform: translateX(3px) scale(0.99);
+}
+
+.sig .ink {
+  transition: transform var(--motion-base) cubic-bezier(0.2, 0.8, 0.25, 1), background-color var(--motion-slide);
+}
+
+.sig:hover .ink {
+  transform: scale(1.3) translate(calc(var(--px, 0) * -5px), calc(var(--py, 0) * -7px));
+  background-color: color-mix(in srgb, var(--t) 34%, transparent);
+}
+
+.sig::after,
+.link::after,
+.tk::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 34%;
+  transform: skewX(var(--slant));
+  background-image: linear-gradient(to right, transparent, color-mix(in srgb, var(--white) 16%, transparent), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sig:hover::after,
+.link:hover::after,
+.tk:hover::after {
+  animation: sheen 0.5s cubic-bezier(0.3, 0.6, 0.3, 1) 1;
+}
+
+@keyframes sheen {
+  from { left: -40%; opacity: 1; }
+  to { left: 110%; opacity: 1; }
+}
+
+.card {
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sig:hover,
+.link:hover,
+.tk:hover,
+.card:hover,
+.card:hover .ink,
+.sig:hover .ink {
+    transform: none;
+  }
+
+  .sig:hover::after,
+.link:hover::after,
+.tk:hover::after {
+    animation: none;
+  }
+}
+
+.sig.on,
+.tk.on {
+  filter: brightness(1.5);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--t, var(--info)) 45%, transparent);
+}
+
+.sig-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sig-subject {
+  font-weight: 600;
+  color: var(--white);
+}
+
+.sig-text {
+  color: var(--light);
+}
+
+.sig.tone-danger .sig-text {
+  font-weight: 600;
+}
+
+/* A life in pips: behind, here, ahead. */
+.pips {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 1px;
+  background: var(--darker);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm-inset);
+}
+
+.pips i {
+  width: 11px;
+  height: 6px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--dark) 45%, transparent);
+}
+
+.pips i.done {
+  background: color-mix(in srgb, var(--t) 50%, transparent);
+}
+
+.pips i.current {
+  background: var(--t);
+  box-shadow: 0 0 5px var(--t);
+}
+
+.pips i.trouble {
+  background: var(--danger);
+  box-shadow: 0 0 5px var(--danger);
+}
+
+/* An issue new to you, or a meeting, on a quiet plate. */
+.tk {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 2px;
+  color: var(--light);
+  font-size: 12.5px;
+  background-color: var(--plate-2);
+  transition: filter var(--motion-base);
+}
+
+.tk.done {
+  background-color: transparent;
+}
+
+.tk-t {
+  flex: 1;
+  min-width: 0;
+}
+
+.tk-w {
+  flex: none;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.clear {
+  margin: auto;
+  color: color-mix(in srgb, var(--medium) 72%, transparent);
+}
+
+/* --------------------------------------------------------------- centre */
+
+.center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.axis {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  height: 28px;
+  overflow: hidden;
+  background: var(--plate-1);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--medium) 76%, transparent);
+}
+
+.tick {
+  position: absolute;
+  top: 8px;
+  padding-left: 4px;
+}
+
+.tick.major {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--light);
+}
+
+.now-tab {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%) skewX(var(--slant));
+  padding: 2px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--black);
+  background: var(--primary);
+  z-index: 1;
+}
+
+.now-tab span {
+  display: block;
+  transform: skewX(calc(var(--slant) * -1));
+}
+
+.map {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.map:active {
+  cursor: grabbing;
+}
+
+.chart {
+  display: block;
+  min-height: 100%;
+}
+
+/* Weeks are told apart by alternating tone, not by lines between them. */
+.week {
+  fill: transparent;
+  pointer-events: none;
+}
+
+.week.odd {
+  fill: color-mix(in srgb, var(--medium) 3.5%, transparent);
+}
+
+.zone-band {
+  fill: color-mix(in srgb, var(--medium) 3%, transparent);
+  pointer-events: none;
+}
+
+.zone-band.current {
+  fill: color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+.zone-band.on {
+  fill: color-mix(in srgb, var(--primary) 13%, transparent);
+}
+
+.past {
+  fill: color-mix(in srgb, var(--black) 44%, transparent);
+  pointer-events: none;
+}
+
+.item,
+.row-label {
+  cursor: pointer;
+  outline: none;
+  transition: opacity var(--motion-base), filter var(--motion-base);
+}
+
+.item rect,
+.item circle,
+.item polygon {
+  fill: var(--t);
+  stroke: none;
+}
+
+.item text,
+.row-label text {
+  fill: color-mix(in srgb, var(--medium) 85%, transparent);
+  font-size: 11.5px;
+}
+
+/* A sprint is a slanted band. */
+.item.band polygon {
+  fill: color-mix(in srgb, var(--t) 34%, var(--darker));
+}
+
+.item.band text {
+  fill: var(--white);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* A row is a faint plate the length of what it belongs to. */
+.item.row rect {
+  fill: color-mix(in srgb, var(--t) 6%, transparent);
+}
+
+.item.row text {
+  fill: color-mix(in srgb, var(--medium) 70%, transparent);
+}
+
+/* Not settled: the same shape, much fainter. */
+.item.outline rect,
+.item.pip rect {
+  fill: color-mix(in srgb, var(--t) 26%, transparent);
+}
+
+.item.outline.wide rect {
+  fill: color-mix(in srgb, var(--t) 12%, transparent);
+}
+
+.item.outline.wide text {
+  font-weight: 700;
+  fill: color-mix(in srgb, var(--medium) 86%, transparent);
+}
+
+.item.live rect {
+  animation: live 1.8s ease-in-out infinite;
+}
+
+.item:hover,
+.item:focus-visible,
+.row-label:hover,
+.row-label:focus-visible {
+  filter: brightness(1.4);
+}
+
+/* Selected: brighter, and lit from behind. */
+.item.on {
+  filter: brightness(1.5) drop-shadow(0 0 5px var(--t));
+}
+
+.item.on text,
+.row-label.on text,
+.row-label:hover text {
+  fill: var(--white);
+}
+
+.row-label rect {
+  fill: var(--t);
+}
+
+.row-label text {
+  fill: var(--light);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.row-label.on {
+  filter: brightness(1.4) drop-shadow(0 0 5px var(--t));
+}
+
+.item.back,
+.row-label.back {
+  opacity: 0.28;
+}
+
+/* Today. A beam of light with a bright core. */
+.beam {
+  fill: url(#beam);
+  pointer-events: none;
+}
+
+.now {
+  fill: var(--primary);
+  pointer-events: none;
+}
+
+@keyframes live {
+  50% {
+    filter: brightness(1.7) drop-shadow(0 0 4px var(--t));
+  }
+}
+
+.controls {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.controls button {
+  pointer-events: auto;
+  min-width: 28px;
+  padding: 4px 10px;
+  text-align: center;
+  background: color-mix(in srgb, var(--black) 70%, var(--dark));
+  box-shadow: var(--shadow-sm);
+}
+
+.readout {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--black) 82%, transparent);
+  color: var(--white);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readout:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- right */
+
+.right {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--plate-1);
+  user-select: text;
+}
+
+.right a {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
+.right a:hover {
+  color: var(--primary);
+}
+
+.card {
+  padding: 11px 13px 13px;
+}
+
+.kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.card h1 {
+  font-size: clamp(16px, 1.2vw, 22px);
+  line-height: 1.2;
+  margin: 3px 0 3px;
+  color: var(--white);
+}
+
+.state {
+  font-weight: 700;
+  color: color-mix(in srgb, var(--t) 32%, var(--white));
+}
+
+/* A life in full. */
+.life {
+  display: flex;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.life li {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--medium) 70%, transparent);
+}
+
+.life li i {
+  display: block;
+  height: 6px;
+  margin-bottom: 4px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--dark) 55%, transparent);
+}
+
+.life li em {
+  font-style: normal;
+  font-size: 11px;
+}
+
+.life li.done {
+  color: var(--light);
+}
+
+.life li.done i {
+  background: color-mix(in srgb, var(--t) 55%, transparent);
+}
+
+.life li.current {
+  color: var(--white);
+  font-weight: 700;
+}
+
+.life li.current i {
+  background: var(--t);
+  box-shadow: 0 0 6px var(--t);
+}
+
+.life li.trouble {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.life li.trouble i {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+}
+
+/* What to do next stands forward: a raised plate with a wash of the theme. */
+.next {
+  padding: 11px 13px;
+  border-radius: 2px;
+  color: var(--white);
+  background-color: var(--plate-2);
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--primary) 22%, transparent), transparent 70%);
+  box-shadow: var(--shadow-sm);
+}
+
+.say {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-radius: 2px;
+  background: var(--darker);
+  box-shadow: var(--shadow-sm-inset);
+  color: var(--secondary);
+  font-size: 12.5px;
+}
+
+.say span {
+  flex: 1;
+}
+
+.say em {
+  font-style: normal;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.say:hover em {
+  color: var(--primary);
+}
+
+.body {
+  color: var(--light);
+}
+
+/* Issue and task text, read as written. */
+.rt {
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+
+.rt-line {
+  display: flex;
+  gap: 8px;
+}
+
+.rt-item {
+  padding-left: 4px;
+}
+
+.rt-mark {
+  flex: none;
+  min-width: 14px;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.rt-gap {
+  height: 9px;
+}
+
+.rt strong {
+  color: var(--white);
+  font-weight: 700;
+}
+
+.rt code,
+code {
+  padding: 0 4px;
+  border-radius: 2px;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--secondary);
+  background: var(--darker);
+}
+
+/* A story is told down the page. Each step has a lamp; nothing joins them. */
+.story {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.story li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  column-gap: 12px;
+  padding-left: 18px;
+}
+
+.story li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--t);
+}
+
+.story .when {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--medium) 82%, transparent);
+}
+
+/* Someone else's words: a wash, not a rule down the side. */
+.story q,
+.agenda q {
+  grid-column: 2;
+  display: block;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 2px;
+  color: var(--white);
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--t, var(--success)) 24%, transparent), color-mix(in srgb, var(--t, var(--success)) 6%, transparent) 60%);
+  quotes: none;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 14px;
+}
+
+.facts > div {
+  display: contents;
+}
+
+.facts dt {
+  color: color-mix(in srgb, var(--medium) 80%, transparent);
+}
+
+.facts dd {
+  color: var(--t, var(--light));
+  font-weight: 600;
+}
+
+.pdf {
+  align-self: flex-start;
+}
+
+.agenda {
+  padding-left: 18px;
+  list-style: decimal;
+}
+
+.agenda li {
+  padding: 3px 0;
+}
+
+.agenda li::marker {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.agenda .answer {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--secondary) 90%, transparent);
+}
+
+.agenda .answer:hover {
+  color: var(--white);
+}
+
+.agenda li.done > p {
+  color: color-mix(in srgb, var(--medium) 72%, transparent);
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.link {
+  color: inherit;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  color: var(--light);
+  transition: filter var(--motion-base);
+}
+
+.link span:not(.ref) {
+  flex: 1;
+  font-weight: 600;
+}
+
+.link em {
+  font-style: normal;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--t) 32%, var(--white));
+}
+
+/* A form on a plate: a note, a task, a meeting, the settings. */
+.sorter {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 11px 13px 13px;
+  border-radius: 2px;
+  background: var(--plate-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.hint {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--medium) 86%, transparent);
+}
+
+.sorter label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sorter label span {
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--medium) 82%, transparent);
+}
+
+/* A field is a well. */
+.sorter input,
+.sorter textarea,
+.sorter select {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 2px;
+  background: var(--darker);
+  box-shadow: var(--shadow-md-inset);
+  color: var(--white);
+  resize: vertical;
+}
+
+/* The date field's own controls are drawn for a light page. */
+.sorter input[type='datetime-local'] {
+  color-scheme: dark;
+}
+
+.sorter input:focus,
+.sorter textarea:focus,
+.sorter select:focus {
+  box-shadow: var(--shadow-md-inset), 0 0 10px color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+.sorter ::placeholder {
+  color: color-mix(in srgb, var(--medium) 62%, transparent);
+}
+
+.refused {
+  padding: 6px 10px;
+  border-radius: 2px;
+  color: var(--white);
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--danger) 40%, transparent), color-mix(in srgb, var(--danger) 10%, transparent));
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: calc(12px + var(--reach));
+  padding: 3px var(--reach);
+}
+
+.save {
+  --ink: var(--primary);
+  padding: 6px 20px;
+  font-weight: 700;
+  color: var(--black);
+}
+
+.save:hover {
+  --ink: var(--secondary);
+}
+
+.save:disabled,
+.undo:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.undo {
+  --ink: color-mix(in srgb, var(--medium) 30%, var(--black));
+  padding: 4px 13px;
+  font-size: 12px;
+  color: var(--light);
+}
+
+.undo:hover {
+  --ink: color-mix(in srgb, var(--medium) 45%, var(--black));
+  color: var(--white);
+}
+
+/* Under the pointer a button's shape jumps and settles a little larger.
+   Pressed, it flattens. Clicked, a burst of the same stuff flies out from
+   behind it and is gone. */
+.tool::after,
+.pull::after,
+.pdf::after,
+.save::after,
+.undo::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 130px;
+  height: 130px;
+  margin: -65px 0 0 -65px;
+  z-index: -2;
+  background-color: var(--ink);
+  mask: var(--shape-burst-1) center / 100% 100% no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tool:hover::before,
+.pull:hover::before,
+.pdf:hover::before,
+.save:hover::before,
+.undo:hover::before {
+  transform: scale(1.05, 1.14);
+  animation: strike 0.34s cubic-bezier(0.2, 0.8, 0.25, 1) 1;
+}
+
+.tool.struck::after,
+.pull.struck::after,
+.pdf.struck::after,
+.save.struck::after,
+.undo.struck::after {
+  animation: burst 0.5s cubic-bezier(0.15, 0.7, 0.3, 1) 1;
+}
+
+.tool:active::before,
+.pull:active::before,
+.pdf:active::before,
+.save:active::before,
+.undo:active::before {
+  transform: scale(0.97, 0.88);
+  animation: none;
+}
+
+@keyframes strike {
+  0% { transform: scale(0.94, 0.9) rotate(0deg); }
+  40% { transform: scale(1.12, 1.32) rotate(-2deg); }
+  100% { transform: scale(1.05, 1.14) rotate(0deg); }
+}
+
+@keyframes burst {
+  0% { opacity: 0.95; transform: scale(0.3) rotate(0deg); }
+  100% { opacity: 0; transform: scale(1.7) rotate(28deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool:hover::before,
+.pull:hover::before,
+.pdf:hover::before,
+.save:hover::before,
+.undo:hover::before,
+.tool.struck::after,
+.pull.struck::after,
+.pdf.struck::after,
+.save.struck::after,
+.undo.struck::after {
+    animation: none;
+  }
+}
+
+/* How tall a bar's shape is drawn, where the texture draws bars at a fixed
+   size. Small buttons get the plain shape, the fourth. */
+.tool,
+.pull,
+.pdf,
+.undo { --bar: 34px; }
+
+/* Which shape each button gets. Neighbours differ. It is a fixed order, not
+   chance: the same button keeps the same shape from one look to the next. */
+.save { --dab: var(--mask-button-1); }
+.tool,
+.pull,
+.undo,
+.pdf { --dab: var(--mask-button-4); }
+
+/* ----------------------------------------------------------------- mini */
+
+.mini {
+  grid-area: mini;
+  height: 44px;
+  background: var(--plate-1);
+  cursor: pointer;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.mini svg {
+  display: block;
+}
+
+.mz {
+  fill: color-mix(in srgb, var(--medium) 14%, transparent);
+}
+
+.mz.closed {
+  fill: color-mix(in srgb, var(--success) 26%, transparent);
+}
+
+.mz.current {
+  fill: color-mix(in srgb, var(--primary) 34%, transparent);
+}
+
+.mini text {
+  fill: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.mini circle {
+  fill: var(--t);
+}
+
+/* Where you are looking: a lit plate over the strip. */
+.view {
+  fill: color-mix(in srgb, var(--white) 14%, transparent);
+}
+
+/* Narrow windows: the docks drop under the map rather than squeezing it. */
+@media (max-width: 1100px) {
+  :host {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(340px, 1fr) auto auto auto;
+    grid-template-areas: 'top' 'center' 'mini' 'left' 'right';
+    overflow-y: auto;
+  }
+
+  .top {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .left,
+.right {
+    overflow: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item.live rect {
+    animation: none;
+  }
+}
+
+/*
+ * What is still a line, and why.
+ *
+ *   Today      The core of the beam is two pixels wide. It is a filled shape,
+ *              not a stroke, but it reads as a line and is meant to. It is the
+ *              one thing on the map that must be found without looking.
+ *   Meters     The points bar, the gauges and the life cycle are thin bars.
+ *              They are measures, where length is the information.
+ *
+ * Nothing else draws an edge around anything.
+ */

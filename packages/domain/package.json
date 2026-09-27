@@ -1,0 +1,15 @@
+{
+  "name": "@battlestation/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Entities, the copies of Jira issues and sprints, derived views and the application service. No framework, no I/O.",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  }
+}

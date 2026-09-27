@@ -1,0 +1,17 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.mock {
+  flex: none;
+  margin: 0;
+  padding: 2px var(--space-4);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--black);
+  background: var(--warning);
+}

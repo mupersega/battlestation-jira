@@ -1,0 +1,19 @@
+{
+  "name": "@battlestation/jira",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-way pull of issues and sprints from Jira, Cloud or Data Center, through its REST API. Reads only.",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "dependencies": {
+    "@battlestation/domain": "*",
+    "@battlestation/data": "*"
+  }
+}
