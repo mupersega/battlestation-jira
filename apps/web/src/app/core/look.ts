@@ -70,17 +70,6 @@ export class Look {
     });
   }
 
-  setAxis(axis: AxisId, value: string): void {
-    this.axisValues.update((current) => ({ ...current, [axis]: value }));
-  }
-
-  reset(): void {
-    this.theme.set('amber');
-    this.font.set('exo-2');
-    this.texture.set('paint');
-    this.axisValues.set({ ...tokens.styleAxisDefaults });
-  }
-
   private validAxes(axes: Partial<AxisValues> | undefined): Partial<AxisValues> {
     const out: Partial<AxisValues> = {};
     for (const axis of this.axes) {

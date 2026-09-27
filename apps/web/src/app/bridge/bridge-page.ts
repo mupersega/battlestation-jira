@@ -23,8 +23,7 @@ interface Step {
   quote: string | null;
 }
 
-/** The symbol for each kind of thing. */
-const ICON: Record<Ref['type'], IconName> = { sprint: 'sprint', issue: 'issue', task: 'task', event: 'event', board: 'board' };
+const ICON: Record<Ref['type'], IconName> = { sprint: 'sprint', issue: 'issue', task: 'task', event: 'event', board: 'board', list: 'backlog' };
 
 interface Link {
   ref: Ref | null;
@@ -66,12 +65,23 @@ interface Detail {
   settings: boolean;
 }
 
-/** A task being written. Its place is '' for none yet, 's:<id>' for a sprint, 'i:<key>' for an issue. */
+/** A task being written, new or changed. Its place is '' for none yet, 's:<id>' for a sprint, 'i:<key>' for an issue. */
 interface TaskDraft {
+  id: string | null;
   title: string;
   type: string;
   description: string;
   place: string;
+}
+
+interface SettingsDraft {
+  title: string;
+  subtitle: string;
+  capacity: string;
+  stale: string;
+  board: string;
+  jql: string;
+  timeZone: string;
 }
 
 interface MeetingDraft {
@@ -87,9 +97,8 @@ const KINDS: Array<{ id: EventKind; label: string }> = [
   { id: 'retro', label: 'Retro' },
   { id: 'one_on_one', label: 'One-to-one' },
   { id: 'meeting', label: 'Meeting' },
-  { id: 'deadline', label: 'Deadline' },
 ];
-const KIND_WORD = Object.fromEntries(KINDS.map((k) => [k.id, k.label])) as Record<EventKind, string>;
+const KIND_WORD: Record<EventKind, string> = { ...(Object.fromEntries(KINDS.map((k) => [k.id, k.label])) as Record<EventKind, string>), deadline: 'Deadline' };
 
 const same = (a: Ref | null, b: Ref | null) => !!a && !!b && a.type === b.type && a.id === b.id;
 const pts = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)} pt${n === 1 ? '' : 's'}`;
@@ -125,13 +134,12 @@ export class BridgePage {
   private readonly mapEl = viewChild<ElementRef<HTMLElement>>('mapBox');
   private readonly miniEl = viewChild<ElementRef<HTMLElement>>('miniBox');
 
-  protected readonly overview = this.api.overview.value;
+  protected readonly overview = computed(() => (this.api.overview.hasValue() ? this.api.overview.value() : undefined));
   protected readonly scene = computed(() => {
     const o = this.overview();
     return o ? buildScene(o) : null;
   });
 
-  // ------------------------------------------------------------- the view
   protected readonly width = signal(0);
   protected readonly miniWidth = signal(0);
   /** Pixels per day. Zero until the map has been measured. */
@@ -140,6 +148,7 @@ export class BridgePage {
   protected readonly offset = signal(0);
 
   protected readonly selected = signal<Ref | null>(null);
+  private arrived = false;
   protected readonly readout = signal('');
   protected readonly copied = signal(false);
 
@@ -176,25 +185,32 @@ export class BridgePage {
       this.taskDraft.set(null);
       this.meetingDraft.set(null);
       this.point.set('');
-      this.refused.set(null);
-      this.when.set(sel?.type === 'event' ? toField(o?.events.find((e) => e.id === sel.id)?.at ?? null) : '');
+      this.blockReason.set(null);
+      this.answering.set(null);
+      this.refusal.set(null);
+      this.when.set(sel?.type === 'event' ? (this.pendingWhen ?? toField(o?.events.find((e) => e.id === sel.id)?.at ?? null)) : '');
+      this.pendingWhen = null;
       this.note.set(sel?.type === 'issue' ? (o?.issues[sel.id]?.note ?? '') : '');
-      if (sel?.type === 'board' && sel.id === 'board' && o) this.settingsDraft.set(this.settingsFrom(o));
+      if (sel?.type === 'board' && o) this.settingsDraft.set(this.settingsFrom(o));
     });
 
-    // Arrive at the thing in the address, if there is one; otherwise at the sprint under way.
+    // Arrive once at the thing in the address, or else at the sprint under way. Afterwards,
+    // if what is selected has gone, such as a meeting that has happened, go back to the sprint.
     effect(() => {
       const o = this.overview();
-      if (!o || untracked(this.selected)) return;
+      if (!o) return;
+      const sel = untracked(this.selected);
+      if (sel) {
+        if (!describe(o, sel)) untracked(() => this.fallBack());
+        return;
+      }
+      if (this.arrived) return;
+      this.arrived = true;
       const at = this.route.snapshot.queryParamMap.get('at') ?? '';
       const cut = at.indexOf(':');
       const [type, id] = cut === -1 ? [at, ''] : [at.slice(0, cut), at.slice(cut + 1)];
-      if (id && describe(o, { type: type as Ref['type'], id })) {
-        this.selected.set({ type: type as Ref['type'], id });
-        return;
-      }
-      const focus = o.sprints.find((s) => s.phase === 'active') ?? o.sprints.find((s) => s.phase === 'future') ?? o.sprints.at(-1);
-      this.selected.set(focus ? { type: 'sprint', id: focus.sprint.id } : { type: 'board', id: 'board' });
+      if (id && describe(o, { type: type as Ref['type'], id })) this.selected.set({ type: type as Ref['type'], id });
+      else this.selected.set(home(o));
     });
   }
 
@@ -214,10 +230,7 @@ export class BridgePage {
     if (!sel || !o) return null;
     if (sel.type === 'sprint') return sel.id;
     if (sel.type === 'issue') return o.issues[sel.id]?.issue.sprintIds.at(-1) ?? null;
-    if (sel.type === 'task') {
-      const t = [...Object.values(o.issues).flatMap((v) => v.tasks), ...o.sprints.flatMap((s) => s.tasks), ...o.unplaced].find((x) => x.id === sel.id);
-      return t?.sprintId ?? null;
-    }
+    if (sel.type === 'task') return allTasks(o).find((x) => x.id === sel.id)?.sprintId ?? null;
     return null;
   });
 
@@ -256,7 +269,7 @@ export class BridgePage {
     const out = [];
     for (const it of s.items) {
       const x = this.x(it.start);
-      const point = it.shape === 'dot' || it.shape === 'diamond' || it.shape === 'flag' || it.shape === 'pip';
+      const point = it.shape === 'diamond' || it.shape === 'flag' || it.shape === 'pip';
       const wide = point ? 0 : Math.max((it.end - it.start) * px, 3);
       if (x + wide < -260 || x > w + 40) continue;
       const cx = point ? this.x(it.start + 0.5) : x;
@@ -279,6 +292,7 @@ export class BridgePage {
         lx,
         pts,
         ly: it.shape === 'band' || (it.shape === 'outline' && it.h > 20) ? it.y + it.h / 2 + 4.5 : it.shape === 'flag' ? it.y + 12 : it.y + it.h / 2 + 4,
+        tab: it.focus === false ? -1 : 0,
         cls: `item ${it.shape}${it.shape === 'outline' && it.h > 20 ? ' wide' : ''} tone-${it.tone}${it.live ? ' live' : ''}${same(sel, it.ref) ? ' on' : ''}${focus && it.sprintId && it.sprintId !== focus ? ' back' : ''}`,
       });
     }
@@ -302,7 +316,6 @@ export class BridgePage {
       .filter((l) => l.to > 0 && l.from < w);
   });
 
-  // ------------------------------------------------------------ the edges
   /** Work in hand first, set apart; then what wants a decision, worst first. Each carries where its object is in its life. */
   protected readonly signals = computed(() => {
     const o = this.overview();
@@ -317,9 +330,7 @@ export class BridgePage {
     }));
   });
 
-  /** What is being worked on now. */
   protected readonly work = computed(() => this.signals().filter((s) => s.level === 'work'));
-  /** What wants a decision or an action. */
   protected readonly needs = computed(() => this.signals().filter((s) => s.level !== 'work'));
 
   /** Issues new to you, or changed since you last looked. */
@@ -349,7 +360,7 @@ export class BridgePage {
     const at = this.overview()?.lastPull?.at;
     return at ? formatDateTime(at) : null;
   });
-  protected readonly live = computed(() => this.api.health.value()?.mode === 'live');
+  protected readonly live = computed(() => this.api.health.hasValue() && this.api.health.value()?.mode === 'live');
 
   protected async pull(): Promise<void> {
     if (this.pulling()) return;
@@ -423,30 +434,43 @@ export class BridgePage {
     return d ? [d] : [];
   });
 
-  // --------------------------------------------------------- writing things
   protected readonly saving = signal(false);
-  protected readonly refused = signal<string | null>(null);
+  /** Why the last change was refused, and on which form, so that it is said where it was asked. */
+  private readonly refusal = signal<{ form: string; text: string } | null>(null);
   protected readonly note = signal('');
   protected readonly when = signal('');
   protected readonly point = signal('');
+  protected readonly blockReason = signal<string | null>(null);
+  protected readonly answering = signal<{ id: string; text: string } | null>(null);
   protected readonly taskDraft = signal<TaskDraft | null>(null);
   protected readonly meetingDraft = signal<MeetingDraft | null>(null);
-  protected readonly settingsDraft = signal<{ title: string; subtitle: string; capacity: string; stale: string; board: string; jql: string } | null>(null);
+  protected readonly settingsDraft = signal<SettingsDraft | null>(null);
   protected readonly kinds = KINDS;
+  /** The date a meeting was just given, to show until the new picture arrives. */
+  private pendingWhen: string | null = null;
+
+  protected refusedFor(form: string): string | null {
+    const r = this.refusal();
+    return r && r.form === form ? r.text : null;
+  }
+
+  private refuse(form: string, text: string | null): void {
+    this.refusal.set(text ? { form, text } : null);
+  }
 
   protected value(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
   }
 
-  private async act(doing: Promise<{ refused: string | null }>): Promise<boolean> {
+  private async act(form: string, doing: Promise<{ refused: string | null }>): Promise<boolean> {
     this.saving.set(true);
     const { refused } = await doing;
-    this.refused.set(refused);
+    this.refuse(form, refused);
     this.saving.set(false);
     return !refused;
   }
 
-  /** Where a new task can go: nowhere yet, a sprint still to run, or one of your open issues. */
+  /** Where a task can go: nowhere yet, a sprint still to run, or one of your open issues. */
   protected readonly places = computed(() => {
     const o = this.overview();
     if (!o) return [];
@@ -465,11 +489,19 @@ export class BridgePage {
     const sel = this.selected();
     const place = sel?.type === 'issue' ? `i:${sel.id}` : sel?.type === 'sprint' && o?.sprints.find((s) => s.sprint.id === sel.id)?.phase !== 'closed' ? `s:${sel.id}` : '';
     this.meetingDraft.set(null);
-    this.refused.set(null);
-    this.taskDraft.set({ title: '', type: o?.taskTypes[0] ?? '', description: '', place });
+    this.refuse('task', null);
+    this.taskDraft.set({ id: null, title: '', type: o?.taskTypes[0] ?? '', description: '', place });
   }
 
-  protected editTask(field: keyof TaskDraft, value: string): void {
+  protected changeTask(id: string): void {
+    const o = this.overview();
+    const t = o ? allTasks(o).find((x) => x.id === id) : undefined;
+    if (!t) return;
+    this.refuse('task', null);
+    this.taskDraft.set({ id: t.id, title: t.title, type: t.type, description: t.description, place: t.issueKey ? `i:${t.issueKey}` : t.sprintId ? `s:${t.sprintId}` : '' });
+  }
+
+  protected editTask(field: 'title' | 'type' | 'description' | 'place', value: string): void {
     this.taskDraft.update((d) => (d ? { ...d, [field]: value } : d));
   }
 
@@ -478,6 +510,7 @@ export class BridgePage {
     if (!d || this.saving()) return;
     this.saving.set(true);
     const made = await this.api.saveTask({
+      id: d.id ?? undefined,
       title: d.title,
       type: d.type || undefined,
       description: d.description,
@@ -485,18 +518,32 @@ export class BridgePage {
       sprintId: d.place.startsWith('s:') ? d.place.slice(2) : null,
     });
     this.saving.set(false);
-    this.refused.set(made.refused);
-    if (made.value) this.pick({ type: 'task', id: made.value.id });
+    this.refuse('task', made.refused);
+    if (!made.value) return;
+    this.taskDraft.set(null);
+    this.pick({ type: 'task', id: made.value.id });
   }
 
   protected async move(id: string, status: 'todo' | 'doing' | 'done'): Promise<void> {
     if (this.saving()) return;
-    await this.act(this.api.setTaskStatus({ id, status }));
+    await this.act('task-status', this.api.setTaskStatus({ id, status }));
+  }
+
+  protected async block(id: string): Promise<void> {
+    const reason = this.blockReason()?.trim();
+    if (this.saving()) return;
+    if (!reason) return this.refuse('task-status', 'Say what it is waiting on.');
+    if (await this.act('task-status', this.api.setTaskStatus({ id, status: 'blocked', reason }))) this.blockReason.set(null);
+  }
+
+  protected async drop(id: string, title: string): Promise<void> {
+    if (this.saving() || !confirm(`Drop "${title}"? It leaves the map.`)) return;
+    if (await this.act('task-status', this.api.setTaskStatus({ id, status: 'dropped' }))) this.fallBack();
   }
 
   protected newMeeting(): void {
     this.taskDraft.set(null);
-    this.refused.set(null);
+    this.refuse('meeting', null);
     this.meetingDraft.set({ title: '', kind: 'meeting', when: '' });
   }
 
@@ -510,19 +557,22 @@ export class BridgePage {
     this.saving.set(true);
     const made = await this.api.saveEvent({ title: d.title, kind: d.kind, at: d.when ? fromField(d.when) : null });
     this.saving.set(false);
-    this.refused.set(made.refused);
-    if (made.value) this.pick({ type: 'event', id: made.value.id });
+    this.refuse('meeting', made.refused);
+    if (!made.value) return;
+    this.meetingDraft.set(null);
+    this.pendingWhen = d.when;
+    this.pick({ type: 'event', id: made.value.id });
   }
 
   protected async setDate(id: string): Promise<void> {
     if (this.saving()) return;
-    if (!this.when()) return this.refused.set('Pick the date and the time first.');
-    await this.act(this.api.saveEvent({ id, at: fromField(this.when()) }));
+    if (!this.when()) return this.refuse('date', 'Pick the date and the time first.');
+    await this.act('date', this.api.saveEvent({ id, at: fromField(this.when()) }));
   }
 
   protected async happened(id: string, title: string): Promise<void> {
-    if (this.saving() || !confirm(`Record that "${title}" happened?`)) return;
-    await this.act(this.api.saveEvent({ id, status: 'done' }));
+    if (this.saving() || !confirm(`Record that "${title}" happened? It leaves the map.`)) return;
+    if (await this.act('date', this.api.saveEvent({ id, status: 'done' }))) this.fallBack();
   }
 
   protected async raise(eventId: string): Promise<void> {
@@ -530,57 +580,89 @@ export class BridgePage {
     const text = this.point().trim();
     const key = /\b[A-Z][A-Z0-9_]*-\d+\b/.exec(text)?.[0] ?? null;
     const known = key && this.overview()?.issues[key] ? key : null;
-    if (await this.act(this.api.addAgendaItem({ eventId, text, issueKey: known }))) this.point.set('');
+    if (await this.act('agenda', this.api.addAgendaItem({ eventId, text, issueKey: known }))) this.point.set('');
   }
 
-  protected async answer(id: string, current: string | null): Promise<void> {
-    const said = prompt('What was the answer?', current ?? '');
-    if (said === null || this.saving()) return;
-    await this.act(this.api.updateAgendaItem({ id, answer: said.trim() || null, status: said.trim() ? 'answered' : 'open' }));
+  protected async saveAnswer(): Promise<void> {
+    const a = this.answering();
+    if (!a || this.saving()) return;
+    const answer = a.text.trim();
+    if (await this.act('agenda', this.api.updateAgendaItem({ id: a.id, answer: answer || null, status: answer ? 'answered' : 'open' }))) this.answering.set(null);
+  }
+
+  protected async dropPoint(id: string): Promise<void> {
+    if (this.saving()) return;
+    if (await this.act('agenda', this.api.updateAgendaItem({ id, status: 'dropped' }))) this.answering.set(null);
   }
 
   protected async saveNote(key: string): Promise<void> {
     if (this.saving()) return;
-    await this.act(this.api.noteIssue({ key, note: this.note() }));
+    await this.act('note', this.api.noteIssue({ key, note: this.note() }));
   }
 
   protected async seen(keys: string[] | 'all'): Promise<void> {
     if (this.saving()) return;
-    await this.act(this.api.markSeen(keys === 'all' ? { all: true } : { keys }));
+    await this.act('seen', this.api.markSeen(keys === 'all' ? { all: true } : { keys }));
   }
 
-  private settingsFrom(o: Overview) {
-    return { title: o.title, subtitle: o.subtitle, capacity: o.capacity === null ? '' : String(o.capacity), stale: String(o.staleAfterDays), board: '', jql: '' };
+  private settingsFrom(o: Overview): SettingsDraft {
+    return {
+      title: o.title,
+      subtitle: o.subtitle,
+      capacity: o.capacity === null ? '' : String(o.capacity),
+      stale: String(o.staleAfterDays),
+      board: o.reading.boardId ?? '',
+      jql: o.reading.jql,
+      timeZone: o.reading.timeZone ?? '',
+    };
   }
 
-  protected editSettings(field: 'title' | 'subtitle' | 'capacity' | 'stale' | 'board' | 'jql', value: string): void {
+  protected editSettings(field: keyof SettingsDraft, value: string): void {
     this.settingsDraft.update((d) => (d ? { ...d, [field]: value } : d));
   }
 
   protected async saveSettings(): Promise<void> {
     const d = this.settingsDraft();
     if (!d || this.saving()) return;
-    const capacity = d.capacity.trim() === '' ? null : Number(d.capacity);
-    const stale = Number(d.stale);
-    if (capacity !== null && !Number.isFinite(capacity)) return this.refused.set('Capacity is a number of points, or empty.');
+    const whole = (s: string) => (/^\d+$/.test(s.trim()) && Number(s) > 0 ? Number(s) : null);
+    const capacity = d.capacity.trim() === '' ? null : whole(d.capacity);
+    if (d.capacity.trim() !== '' && capacity === null) return this.refuse('settings', 'Capacity is a whole number of points, or empty.');
+    const stale = whole(d.stale);
+    if (stale === null) return this.refuse('settings', 'Say after how many working days in progress an issue is called out: a whole number, 1 or more.');
     await this.act(
-      this.api.saveSettings({
-        title: d.title,
-        subtitle: d.subtitle,
-        capacityPoints: capacity,
-        staleAfterDays: Number.isFinite(stale) ? stale : undefined,
-        ...(d.board.trim() ? { boardId: d.board.trim() } : {}),
-        ...(d.jql.trim() ? { jql: d.jql.trim() } : {}),
-      }),
+      'settings',
+      this.api.saveSettings({ title: d.title, subtitle: d.subtitle, capacityPoints: capacity, staleAfterDays: stale, boardId: d.board.trim() || null, jql: d.jql.trim(), timeZone: d.timeZone.trim() || null }),
     );
   }
 
-  // --------------------------------------------------------------- moving
+  /** What the last pull said, as a sentence. */
+  protected readonly pullNote = computed(() => {
+    const p = this.pullSaid();
+    if (!p) return null;
+    return { ok: p.ok, text: /[.!?]$/.test(p.said) ? p.said : `${p.said}.` };
+  });
+
   protected pick(ref: Ref, event?: Event): void {
     event?.stopPropagation();
+    // Picking what is already selected keeps whatever is being written in it.
+    if (same(this.selected(), ref)) return;
     this.selected.set(ref);
     this.copied.set(false);
     void this.router.navigate([], { relativeTo: this.route, queryParams: { at: `${ref.type}:${ref.id}` }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  /** Space as well as Enter picks a thing on the map. */
+  protected press(ref: Ref, e: Event): void {
+    e.preventDefault();
+    this.pick(ref);
+  }
+
+  /** Back to the sprint under way, when what was selected has gone. */
+  private fallBack(): void {
+    const o = this.overview();
+    if (!o) return;
+    this.selected.set(null);
+    this.pick(home(o));
   }
 
   /** Select a thing and bring it into view. */
@@ -703,6 +785,7 @@ export class BridgePage {
         break;
       case 'Escape':
         this.selected.set(null);
+        void this.router.navigate([], { relativeTo: this.route, queryParams: { at: null }, queryParamsHandling: 'merge', replaceUrl: true });
         break;
       default:
         return;
@@ -726,10 +809,19 @@ export class BridgePage {
   protected readonly formatDay = formatDay;
 }
 
-// ---------------------------------------------------------------------------
 // What the selection panel says about each kind of thing.
 
-function issueLink(o: Overview, v: IssueView, note?: string): Link {
+/** Where the screen goes when there is nowhere better: the sprint under way, the next, the last, or the board. */
+function home(o: Overview): Ref {
+  const s = o.sprints.find((x) => x.phase === 'active') ?? o.sprints.find((x) => x.phase === 'future') ?? o.sprints.at(-1);
+  return s ? { type: 'sprint', id: s.sprint.id } : { type: 'board', id: 'board' };
+}
+
+function allTasks(o: Overview): Task[] {
+  return [...Object.values(o.issues).flatMap((v) => v.tasks), ...o.sprints.flatMap((s) => s.tasks), ...o.unplaced];
+}
+
+function issueLink(v: IssueView, note?: string): Link {
   const i = v.issue;
   return { ref: { type: 'issue', id: i.key }, href: null, icon: 'issue', badge: i.key, text: i.summary, tone: issueTone(v), note: note ?? `${i.status.toLowerCase()}${i.points !== null ? `, ${pts(i.points)}` : ''}` };
 }
@@ -775,7 +867,7 @@ export function describe(o: Overview, ref: Ref): Detail | null {
       state: life?.now ?? so.phase,
       body: richText(s.goal ? `Goal: ${s.goal}` : ''),
       facts,
-      links: [...so.issues.map((v) => issueLink(o, v)), ...so.tasks.map((t) => taskLink(o, t))],
+      links: [...so.issues.map((v) => issueLink(v)), ...so.tasks.map((t) => taskLink(o, t))],
       next: lead?.next ?? (so.issues.length ? null : 'Nothing of yours in it yet.'),
     };
   }
@@ -823,15 +915,14 @@ export function describe(o: Overview, ref: Ref): Detail | null {
   }
 
   if (ref.type === 'task') {
-    const all = [...Object.values(o.issues).flatMap((v) => v.tasks), ...o.sprints.flatMap((s) => s.tasks), ...o.unplaced];
-    const t = all.find((x) => x.id === ref.id);
+    const t = allTasks(o).find((x) => x.id === ref.id);
     if (!t) return null;
     const facts: Fact[] = [{ k: 'Kind', v: t.type }];
     if (t.startedOn) facts.push({ k: 'Started', v: formatDay(t.startedOn) });
     if (t.doneOn) facts.push({ k: 'Finished', v: formatDay(t.doneOn), tone: 'success' });
     if (t.status === 'blocked') facts.push({ k: 'Blocked by', v: t.blockedBy, tone: 'danger' });
     const links: Link[] = [];
-    if (t.issueKey && o.issues[t.issueKey]) links.push(issueLink(o, o.issues[t.issueKey]));
+    if (t.issueKey && o.issues[t.issueKey]) links.push(issueLink(o.issues[t.issueKey]));
     const sprint = t.sprintId ? o.sprints.find((s) => s.sprint.id === t.sprintId) : undefined;
     if (sprint) links.push({ ref: { type: 'sprint', id: sprint.sprint.id }, href: null, icon: 'sprint', badge: o.refs[`sprint:${sprint.sprint.id}`] ?? '', text: sprint.sprint.name, tone: PHASE_TONE[sprint.phase], note: sprint.phase });
     return {
@@ -860,17 +951,17 @@ export function describe(o: Overview, ref: Ref): Detail | null {
       state: e.at ? formatDateTime(e.at) : 'no date yet',
       body: richText(e.notes),
       agenda: e.agenda.map((a) => ({ id: a.id, text: a.text, answer: a.answer, open: a.status === 'open', issue: a.issueKey })),
-      links: e.agenda.filter((a) => a.issueKey && o.issues[a.issueKey]).map((a) => issueLink(o, o.issues[a.issueKey!], 'raised here')),
+      links: e.agenda.filter((a) => a.issueKey && o.issues[a.issueKey]).map((a) => issueLink(o.issues[a.issueKey!], 'raised here')),
       meeting: e.status === 'planned' ? { id: e.id, at: e.at } : null,
       next: lead?.next ?? (open ? `${open} to raise.` : null),
     };
   }
 
-  if (ref.type === 'board' && ref.id === 'backlog') {
-    return { ...base, badge: '', kind: 'Backlog', title: 'In no sprint', tone: 'neutral', state: `${o.backlog.length} of yours, open`, links: o.backlog.map((v) => issueLink(o, v)), icon: 'backlog' };
+  if (ref.type === 'list' && ref.id === 'backlog') {
+    return { ...base, badge: '', kind: 'Backlog', title: 'In no sprint', tone: 'neutral', state: `${o.backlog.length} of yours, open`, links: o.backlog.map((v) => issueLink(v)) };
   }
 
-  if (ref.type === 'board' && ref.id === 'unplaced') {
+  if (ref.type === 'list' && ref.id === 'unplaced') {
     return { ...base, badge: '', kind: 'Your own', title: 'In no sprint, for no issue', tone: 'neutral', state: `${o.unplaced.length} task${o.unplaced.length === 1 ? '' : 's'}`, links: o.unplaced.map((t) => taskLink(o, t)), icon: 'task' };
   }
 

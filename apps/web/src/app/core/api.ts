@@ -45,7 +45,7 @@ export class Api {
     return this.write<{ id: string }>('/api/tasks/save', body);
   }
 
-  setTaskStatus(body: { id: string; status: 'todo' | 'doing' | 'blocked' | 'done'; reason?: string }) {
+  setTaskStatus(body: { id: string; status: 'todo' | 'doing' | 'blocked' | 'done' | 'dropped'; reason?: string }) {
     return this.write('/api/tasks/status', body);
   }
 
@@ -61,7 +61,7 @@ export class Api {
     return this.write('/api/events/agenda/update', body);
   }
 
-  saveSettings(body: { title?: string; subtitle?: string; capacityPoints?: number | null; staleAfterDays?: number; boardId?: string | null; jql?: string }) {
+  saveSettings(body: { title?: string; subtitle?: string; capacityPoints?: number | null; staleAfterDays?: number; boardId?: string | null; jql?: string; timeZone?: string | null }) {
     return this.write('/api/settings', body);
   }
 

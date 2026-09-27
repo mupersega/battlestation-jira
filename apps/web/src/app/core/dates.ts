@@ -45,6 +45,11 @@ export function toField(at: string | null): string {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
+/** The day a moment falls on here, as YYYY-MM-DD. */
+export function localDay(at: string): string {
+  return toField(at).slice(0, 10);
+}
+
 /** What a date-and-time field holds, as a moment with this machine's offset from UTC on that day. */
 export function fromField(value: string): string {
   const offset = -new Date(value).getTimezoneOffset();

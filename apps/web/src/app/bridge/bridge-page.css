@@ -145,25 +145,25 @@ a {
   color: color-mix(in srgb, var(--black) 65%, transparent);
 }
 
-.client {
+.subtitle {
   color: color-mix(in srgb, var(--black) 80%, transparent);
   font-weight: 600;
 }
 
 /* The sprint's points across the top. The two marks are the only lines on
    it: where a straight line says done should be by now, and capacity. */
-.res {
+.points {
   flex: 1 1 340px;
   min-width: 340px;
   max-width: 900px;
   text-align: left;
 }
 
-.res:hover .res-nums {
+.points:hover .points-nums {
   color: var(--white);
 }
 
-.res-bar {
+.points-bar {
   position: relative;
   display: flex;
   height: 10px;
@@ -174,17 +174,17 @@ a {
   box-shadow: var(--shadow-sm-inset);
 }
 
-.res-bar i {
+.points-bar i {
   display: block;
   border-radius: 1px;
   min-width: 0;
 }
 
-.res-bar .paid { background: var(--success); }
-.res-bar .waiting { background: var(--info); }
-.res-bar .todo { background: color-mix(in srgb, var(--medium) 34%, transparent); }
+.points-bar .seg-done { background: var(--success); }
+.points-bar .seg-doing { background: var(--info); }
+.points-bar .seg-todo { background: color-mix(in srgb, var(--medium) 34%, transparent); }
 
-.res-bar b {
+.points-bar b {
   position: absolute;
   top: -3px;
   bottom: -3px;
@@ -193,11 +193,11 @@ a {
   border-radius: 1px;
 }
 
-.res-bar .expected { background: var(--warning); box-shadow: 0 0 5px var(--warning); }
-.res-bar .capacity { background: var(--white); }
-.res-bar.over .capacity { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+.points-bar .expected { background: var(--warning); box-shadow: 0 0 5px var(--warning); }
+.points-bar .capacity { background: var(--white); }
+.points-bar.over .capacity { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
 
-.res-nums {
+.points-nums {
   display: flex;
   gap: 14px;
   margin-top: 3px;
@@ -205,17 +205,17 @@ a {
   color: color-mix(in srgb, var(--medium) 86%, transparent);
 }
 
-.res-nums b {
+.points-nums b {
   font-weight: 700;
   font-size: 13px;
 }
 
-.res-nums .paid b { color: var(--success); }
-.res-nums .waiting b { color: var(--info); }
-.res-nums .late b { color: var(--danger); }
-.res-nums .of { margin-left: auto; }
-.res-nums .of.bad { color: var(--danger); font-weight: 700; }
-.res-nums .sprint-name { font-weight: 700; color: var(--white); }
+.points-nums .seg-done b { color: var(--success); }
+.points-nums .seg-doing b { color: var(--info); }
+.points-nums .seg-warn b { color: var(--warning); }
+.points-nums .of { margin-left: auto; }
+.points-nums .of.bad { color: var(--danger); font-weight: 700; }
+.points-nums .sprint-name { font-weight: 700; color: var(--white); }
 
 .gauge {
   display: flex;
@@ -320,7 +320,7 @@ a {
   background-color: var(--white);
 }
 
-/* Each face is shown in itself. */
+/* Each face's button is written in that face. */
 .faces button {
   position: relative;
   isolation: isolate;
@@ -350,8 +350,8 @@ a {
 /* A button is a press of paint. Its colour is --ink; its shape is one of
    four, given out in turn at the end of this sheet. */
 .tool,
-.pull,
-.pdf,
+.minor,
+.jira-link,
 .save,
 .undo {
   position: relative;
@@ -360,8 +360,8 @@ a {
 }
 
 .tool::before,
-.pull::before,
-.pdf::before,
+.minor::before,
+.jira-link::before,
 .save::before,
 .undo::before {
   content: '';
@@ -375,8 +375,8 @@ a {
 }
 
 .tool,
-.pull,
-.pdf {
+.minor,
+.jira-link {
   --ink: color-mix(in srgb, var(--medium) 24%, var(--black));
   padding: 4px 13px;
   font-size: 12px;
@@ -386,20 +386,24 @@ a {
 }
 
 .tool:hover,
-.pull:hover,
-.pdf:hover {
+.minor:hover,
+.jira-link:hover {
   --ink: var(--primary);
   color: var(--black);
 }
 
 /* The map's own controls stay plain plates: they are small and sit on the map. */
 .controls button {
-  padding: 4px 11px;
+  pointer-events: auto;
+  min-width: 28px;
+  padding: 4px 10px;
   border-radius: 2px;
   font-size: 12px;
   font-weight: 600;
+  text-align: center;
   color: var(--light);
-  background: var(--plate-3);
+  background: color-mix(in srgb, var(--black) 70%, var(--dark));
+  box-shadow: var(--shadow-sm);
   transition: background-color var(--motion-base), color var(--motion-base);
 }
 
@@ -455,7 +459,7 @@ a {
 }
 
 /* A control on a stroke is dark, so that it reads on any colour of paint. */
-.zone-head .pull {
+.zone-head .minor {
   margin-left: auto;
   padding: 1px 10px;
   font-size: 11.5px;
@@ -474,7 +478,7 @@ a {
   color: var(--danger);
 }
 
-.pull:disabled {
+.minor:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -503,7 +507,7 @@ a {
 .sig,
 .link,
 .card,
-.tk.done {
+.entry.meeting {
   background-image: linear-gradient(to right, color-mix(in srgb, var(--t) 26%, transparent), color-mix(in srgb, var(--t) 7%, transparent) 46%, color-mix(in srgb, var(--t) 3%, transparent));
   border-radius: 2px;
 }
@@ -553,20 +557,16 @@ a {
 
 .sig:hover,
 .link:hover,
-.tk:hover {
+.entry:hover {
   filter: brightness(1.3);
 }
 
-/* Under the pointer a card comes forward: it steps toward the map, leans
-   toward the pointer as a thing with depth would, the paint in it swells
-   and takes the card's colour, and a slanted sheen crosses it once. The
-   paint lies a little behind the card's face, so as the card leans the
-   paint is seen to shift: by as much as a thing 60px behind would, and in
-   step with the lean, not after it. No shadow. --px and --py are where the
+/* Under the pointer a card leans toward it, and the paint inside, a little
+   behind the card's face, shifts with the lean. --px and --py are where the
    pointer is over the card, each from -1 to 1. */
 .sig,
 .link,
-.tk {
+.entry {
   position: relative;
   overflow: hidden;
   flex: none;
@@ -575,7 +575,7 @@ a {
 
 .sig:hover,
 .link:hover,
-.tk:hover {
+.entry:hover {
   transform: perspective(520px) translateX(6px) rotateY(calc(var(--px, 0) * 5deg)) rotateX(calc(var(--py, 0) * -7deg));
 }
 
@@ -597,7 +597,7 @@ a {
 
 .sig:active,
 .link:active,
-.tk:active {
+.entry:active {
   transform: translateX(3px) scale(0.99);
 }
 
@@ -612,7 +612,7 @@ a {
 
 .sig::after,
 .link::after,
-.tk::after {
+.entry::after {
   content: '';
   position: absolute;
   top: 0;
@@ -627,7 +627,7 @@ a {
 
 .sig:hover::after,
 .link:hover::after,
-.tk:hover::after {
+.entry:hover::after {
   animation: sheen 0.5s cubic-bezier(0.3, 0.6, 0.3, 1) 1;
 }
 
@@ -643,7 +643,7 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .sig:hover,
 .link:hover,
-.tk:hover,
+.entry:hover,
 .card:hover,
 .card:hover .ink,
 .sig:hover .ink {
@@ -652,13 +652,13 @@ a {
 
   .sig:hover::after,
 .link:hover::after,
-.tk:hover::after {
+.entry:hover::after {
     animation: none;
   }
 }
 
 .sig.on,
-.tk.on {
+.entry.on {
   filter: brightness(1.5);
   box-shadow: 0 0 14px color-mix(in srgb, var(--t, var(--info)) 45%, transparent);
 }
@@ -716,7 +716,7 @@ a {
 }
 
 /* An issue new to you, or a meeting, on a quiet plate. */
-.tk {
+.entry {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -728,16 +728,13 @@ a {
   transition: filter var(--motion-base);
 }
 
-.tk.done {
-  background-color: transparent;
-}
 
-.tk-t {
+.entry-t {
   flex: 1;
   min-width: 0;
 }
 
-.tk-w {
+.entry-w {
   flex: none;
   font-size: 11px;
   color: color-mix(in srgb, var(--medium) 80%, transparent);
@@ -967,15 +964,6 @@ a {
   align-items: center;
   gap: 4px;
   pointer-events: none;
-}
-
-.controls button {
-  pointer-events: auto;
-  min-width: 28px;
-  padding: 4px 10px;
-  text-align: center;
-  background: color-mix(in srgb, var(--black) 70%, var(--dark));
-  box-shadow: var(--shadow-sm);
 }
 
 .readout {
@@ -1244,7 +1232,7 @@ code {
   font-weight: 600;
 }
 
-.pdf {
+.jira-link {
   align-self: flex-start;
 }
 
@@ -1283,13 +1271,11 @@ code {
 }
 
 .link {
-  color: inherit;
   display: flex;
   align-items: baseline;
   gap: 10px;
   padding: 6px 10px;
   color: var(--light);
-  transition: filter var(--motion-base);
 }
 
 .link span:not(.ref) {
@@ -1304,7 +1290,7 @@ code {
 }
 
 /* A form on a plate: a note, a task, a meeting, the settings. */
-.sorter {
+.form {
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -1319,21 +1305,21 @@ code {
   color: color-mix(in srgb, var(--medium) 86%, transparent);
 }
 
-.sorter label {
+.form label {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
-.sorter label span {
+.form label span {
   font-size: 11.5px;
   color: color-mix(in srgb, var(--medium) 82%, transparent);
 }
 
 /* A field is a well. */
-.sorter input,
-.sorter textarea,
-.sorter select {
+.form input,
+.form textarea,
+.form select {
   width: 100%;
   padding: 7px 9px;
   border-radius: 2px;
@@ -1344,17 +1330,17 @@ code {
 }
 
 /* The date field's own controls are drawn for a light page. */
-.sorter input[type='datetime-local'] {
+.form input[type='datetime-local'] {
   color-scheme: dark;
 }
 
-.sorter input:focus,
-.sorter textarea:focus,
-.sorter select:focus {
+.form input:focus,
+.form textarea:focus,
+.form select:focus {
   box-shadow: var(--shadow-md-inset), 0 0 10px color-mix(in srgb, var(--primary) 60%, transparent);
 }
 
-.sorter ::placeholder {
+.form ::placeholder {
   color: color-mix(in srgb, var(--medium) 62%, transparent);
 }
 
@@ -1367,6 +1353,7 @@ code {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: calc(12px + var(--reach));
   padding: 3px var(--reach);
@@ -1405,8 +1392,8 @@ code {
    Pressed, it flattens. Clicked, a burst of the same stuff flies out from
    behind it and is gone. */
 .tool::after,
-.pull::after,
-.pdf::after,
+.minor::after,
+.jira-link::after,
 .save::after,
 .undo::after {
   content: '';
@@ -1424,8 +1411,8 @@ code {
 }
 
 .tool:hover::before,
-.pull:hover::before,
-.pdf:hover::before,
+.minor:hover::before,
+.jira-link:hover::before,
 .save:hover::before,
 .undo:hover::before {
   transform: scale(1.05, 1.14);
@@ -1433,16 +1420,16 @@ code {
 }
 
 .tool.struck::after,
-.pull.struck::after,
-.pdf.struck::after,
+.minor.struck::after,
+.jira-link.struck::after,
 .save.struck::after,
 .undo.struck::after {
   animation: burst 0.5s cubic-bezier(0.15, 0.7, 0.3, 1) 1;
 }
 
 .tool:active::before,
-.pull:active::before,
-.pdf:active::before,
+.minor:active::before,
+.jira-link:active::before,
 .save:active::before,
 .undo:active::before {
   transform: scale(0.97, 0.88);
@@ -1462,13 +1449,13 @@ code {
 
 @media (prefers-reduced-motion: reduce) {
   .tool:hover::before,
-.pull:hover::before,
-.pdf:hover::before,
+.minor:hover::before,
+.jira-link:hover::before,
 .save:hover::before,
 .undo:hover::before,
 .tool.struck::after,
-.pull.struck::after,
-.pdf.struck::after,
+.minor.struck::after,
+.jira-link.struck::after,
 .save.struck::after,
 .undo.struck::after {
     animation: none;
@@ -1478,17 +1465,17 @@ code {
 /* How tall a bar's shape is drawn, where the texture draws bars at a fixed
    size. Small buttons get the plain shape, the fourth. */
 .tool,
-.pull,
-.pdf,
+.minor,
+.jira-link,
 .undo { --bar: 34px; }
 
 /* Which shape each button gets. Neighbours differ. It is a fixed order, not
    chance: the same button keeps the same shape from one look to the next. */
 .save { --dab: var(--mask-button-1); }
 .tool,
-.pull,
+.minor,
 .undo,
-.pdf { --dab: var(--mask-button-4); }
+.jira-link { --dab: var(--mask-button-4); }
 
 /* ----------------------------------------------------------------- mini */
 
@@ -1570,3 +1557,57 @@ code {
  *
  * Nothing else draws an edge around anything.
  */
+
+/* A thing on the map reached with the keyboard glows, as a focused control does. */
+.item:focus-visible,
+.row-label:focus-visible {
+  outline: 0;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 85%, transparent));
+}
+
+/* Said on the map when there is nothing to draw yet. */
+.empty {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 460px;
+  padding: 14px 18px;
+  border-radius: 2px;
+  text-align: center;
+  color: var(--light);
+  background: var(--plate-1);
+  pointer-events: none;
+}
+
+.empty b {
+  color: var(--white);
+}
+
+/* Answering an agenda point where it is. */
+.agenda .answering {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.agenda .answering textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 2px;
+  background: var(--darker);
+  box-shadow: var(--shadow-md-inset);
+  color: var(--white);
+}
+
+.block-reason {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 2px;
+  background: var(--darker);
+  box-shadow: var(--shadow-md-inset);
+  color: var(--white);
+}
+

@@ -71,12 +71,10 @@ export interface IssueSnapshot {
   description: string;
   created: ISODateTime;
   updated: ISODateTime;
-  /** When it was resolved, if it has been. */
   resolved: ISODateTime | null;
   due: ISODate | null;
   /** When it first moved into progress, from its history, if that could be read. */
   started: ISODateTime | null;
-  /** Flagged as an impediment in Jira. */
   flagged: boolean;
   links: IssueLinkView[];
   /** The latest comments, oldest first. */

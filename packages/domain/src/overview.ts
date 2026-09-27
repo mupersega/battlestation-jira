@@ -12,7 +12,8 @@ import { currentSprintId, type IssueLinkView, type IssueSnapshot, type SprintSna
 import { eventLifecycle, issueLifecycle, sprintLifecycle, taskLifecycle, type Lifecycle } from "./lifecycle.js";
 import type { AgendaItem, Event, IssueNote, PullRecord, Settings, Task } from "./types.js";
 
-export type RefType = "sprint" | "issue" | "task" | "event" | "board";
+/** "list" is one of the screen's own lists, such as the backlog. */
+export type RefType = "sprint" | "issue" | "task" | "event" | "board" | "list";
 
 export interface Ref {
   type: RefType;
@@ -46,13 +47,11 @@ export interface Signal {
 
 export interface IssueView {
   issue: IssueSnapshot;
-  /** Your private note on it. */
   note: string;
   /** New to you, or changed in Jira since you last marked it seen. */
   fresh: boolean;
   /** Issues that block it and are not done yet. */
   blockedBy: IssueLinkView[];
-  /** Issues it blocks. */
   blocks: IssueLinkView[];
   /** Your own tasks under it, in order. Dropped tasks are left out. */
   tasks: Task[];
@@ -82,7 +81,6 @@ export interface SprintOverview {
   points: Points;
   /** Working days left, today included, while it is active. */
   daysLeft: number | null;
-  /** Working days in it. */
   days: number | null;
   /** Points that would be done by today on a straight line from start to end, while active. */
   expected: number | null;
@@ -98,6 +96,8 @@ export interface Overview {
   subtitle: string;
   /** The Jira site, for opening things there. */
   jiraUrl: string | null;
+  /** Which board and issues the pull reads, and the team's time zone, as set. */
+  reading: { boardId: string | null; jql: string; timeZone: string | null };
   sprints: SprintOverview[];
   activeSprintId: string | null;
   /** Your open issues that are in no sprint that is still to run. */
@@ -240,7 +240,6 @@ export function deriveOverview(input: OverviewInputs): Overview {
   const openSprintIds = new Set(sprints.filter((s) => s.phase !== "closed").map((s) => s.sprint.id));
   const backlog = mine.filter((v) => v.issue.statusCategory !== "done" && !openSprintIds.has(currentSprintId(v.issue) ?? "")).sort(byKey);
 
-  // Epics and parents.
   const parents: Overview["parents"] = {};
   for (const v of Object.values(issues)) {
     const p = v.issue.parent;
@@ -324,7 +323,6 @@ export function deriveOverview(input: OverviewInputs): Overview {
     }
   }
 
-  // Signals about sprints.
   for (const so of sprints) {
     const s = so.sprint;
     const ref: Ref = { type: "sprint", id: s.id };
@@ -383,7 +381,6 @@ export function deriveOverview(input: OverviewInputs): Overview {
     }
   }
 
-  // Your own tasks.
   for (const t of live) {
     const ref: Ref = { type: "task", id: t.id };
     lifecycles[`task:${t.id}`] = taskLifecycle(t);
@@ -396,7 +393,6 @@ export function deriveOverview(input: OverviewInputs): Overview {
     }
   }
 
-  // Meetings.
   const events = input.events
     .filter((e) => e.status === "planned")
     .sort((a, b) => (a.at === null ? 1 : b.at === null ? -1 : compareMoments(a.at, b.at)))
@@ -437,6 +433,7 @@ export function deriveOverview(input: OverviewInputs): Overview {
     title: settings.title,
     subtitle: settings.subtitle,
     jiraUrl: settings.jira.baseUrl,
+    reading: { boardId: settings.jira.boardId, jql: settings.jira.jql, timeZone: settings.jira.timeZone },
     sprints,
     activeSprintId: activeId,
     backlog,

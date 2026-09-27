@@ -1,4 +1,4 @@
-@if (api.health.value(); as h) {
+@if (api.health.hasValue() ? api.health.value() : null; as h) {
   @if (h.mode === 'mock') {
     <p class="mock" role="status">Mock sprint. Invented data, pretending today is {{ h.today }}.</p>
   }

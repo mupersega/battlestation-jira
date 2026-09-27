@@ -100,7 +100,7 @@ export function createApiServer({ app, version, staticDir = null, mode = "live",
       "/api/tasks/status",
       (b) => {
         const status = text(b.status);
-        if (status !== "todo" && status !== "doing" && status !== "blocked" && status !== "done") throw new DomainError("status must be todo, doing, blocked or done.");
+        if (status !== "todo" && status !== "doing" && status !== "blocked" && status !== "done" && status !== "dropped") throw new DomainError("status must be todo, doing, blocked, done or dropped.");
         return app.setTaskStatus("bridge", { id: text(b.id) ?? "", status, reason: text(b.reason) });
       },
     ],
@@ -131,7 +131,7 @@ export function createApiServer({ app, version, staticDir = null, mode = "live",
           subtitle: text(b.subtitle),
           capacityPoints: b.capacityPoints === null ? null : typeof b.capacityPoints === "number" ? b.capacityPoints : undefined,
           staleAfterDays: typeof b.staleAfterDays === "number" ? b.staleAfterDays : undefined,
-          jira: { boardId: nullableText(b.boardId), jql: text(b.jql) },
+          jira: { boardId: nullableText(b.boardId), jql: text(b.jql), timeZone: nullableText(b.timeZone) },
         }),
     ],
   ]);

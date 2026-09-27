@@ -97,7 +97,7 @@ test("seen, tasks, meetings and settings from the screen", async () => {
   assert.equal(t.sprintId, "41");
   assert.equal((await post("/api/tasks/status", { id: t.id, status: "doing" })).body.startedOn, "2027-03-10");
   assert.equal((await post("/api/tasks/status", { id: t.id, status: "blocked" })).status, 400);
-  assert.equal((await post("/api/tasks/status", { id: t.id, status: "dropped" })).status, 400);
+  assert.equal((await post("/api/tasks/status", { id: t.id, status: "lost" })).status, 400);
 
   const e = (await post("/api/events/save", { title: "Pairing", kind: "meeting", at: "2027-03-11T13:00:00+10:00" })).body;
   assert.equal(e.number > 1, true);

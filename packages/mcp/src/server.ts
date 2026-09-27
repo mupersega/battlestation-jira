@@ -97,7 +97,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
     return info?.name ? `mcp:${info.name}` : "mcp";
   };
 
-  // ------------------------------------------------------------ The picture
+  // The picture
 
   server.registerTool(
     "get_today",
@@ -157,7 +157,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
       ),
   );
 
-  // --------------------------------------------------------------- Jira
+  // Jira
 
   server.registerTool(
     "pull_jira",
@@ -194,7 +194,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
     async (a, ctx) => guard(() => json(app.noteIssue(actorOf(ctx), a))),
   );
 
-  // --------------------------------------------------------------- Tasks
+  // Tasks
 
   server.registerTool(
     "list_tasks",
@@ -230,7 +230,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
     async (a, ctx) => guard(() => json(app.setTaskStatus(actorOf(ctx), { id: a.id, status: a.status as never, reason: a.reason, on: a.on }))),
   );
 
-  // ------------------------------------------------------------ Meetings
+  // Meetings
 
   server.registerTool(
     "list_events",
@@ -271,7 +271,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
     async (a, ctx) => guard(() => json(app.updateAgendaItem(actorOf(ctx), a))),
   );
 
-  // ------------------------------------------------------------ Settings
+  // Settings
 
   server.registerTool(
     "get_settings",
@@ -312,7 +312,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
       ),
   );
 
-  // -------------------------------------------------------------- Record
+  // Record
 
   server.registerTool(
     "list_audit",

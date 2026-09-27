@@ -1,5 +1,5 @@
 import type { IssueView, Overview, Ref, SprintOverview, Task } from '@battlestation/domain';
-import { addDays, toUtc } from '../core/dates';
+import { addDays, formatDateTime, localDay, toUtc } from '../core/dates';
 
 /**
  * The scene: everything placed in time (days from an origin, left to right)
@@ -8,7 +8,7 @@ import { addDays, toUtc } from '../core/dates';
  */
 
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral';
-export type Shape = 'band' | 'bar' | 'row' | 'outline' | 'dot' | 'diamond' | 'flag' | 'pip';
+export type Shape = 'band' | 'bar' | 'row' | 'outline' | 'diamond' | 'flag' | 'pip';
 
 export interface Item {
   key: string;
@@ -28,6 +28,8 @@ export interface Item {
   sprintId: string | null;
   /** Draws the eye: something is moving or late. */
   live: boolean;
+  /** Reached with the keyboard. An issue with a label on its row is reached by the label instead. */
+  focus?: boolean;
 }
 
 export interface RowLabel {
@@ -116,7 +118,7 @@ export function buildScene(o: Overview): Scene {
    * Your own tasks under something. Finished ones are short bars where they
    * happened, packed onto compact lines. Each one still open gets a line of
    * its own with its name: in hand runs up to today, blocked is the same in
-   * outline, queued is a hollow mark just ahead of today.
+   * outline, queued is a faint mark just ahead of today.
    */
   const placeTasks = (tasks: Task[], sprintId: string | null, top: number, refs: Record<string, string>): number => {
     if (tasks.length === 0) return top;
@@ -164,8 +166,8 @@ export function buildScene(o: Overview): Scene {
     const tone = issueTone(v);
     const pts = i.points === null ? 'no estimate' : `${i.points} pt${i.points === 1 ? '' : 's'}`;
     labels.push({ key: `label-${i.key}`, ref, text: `${i.key}  ${i.summary}`, tone, y: top + 12, from, to, sprintId });
-    items.push({ key: `row-${i.key}`, ref, shape: 'row', tone, start: from, end: to, y: top + 1, h: ROW - 5, label: '', title: `${i.key} ${i.summary}: ${i.status}, ${pts}`, sprintId, live: false });
-    const bar = { key: `bar-${i.key}`, ref, tone, y: top + 16, h: 8, label: '', sprintId };
+    items.push({ key: `row-${i.key}`, ref, shape: 'row', tone, start: from, end: to, y: top + 1, h: ROW - 5, label: '', title: `${i.key} ${i.summary}: ${i.status}, ${pts}`, sprintId, live: false, focus: false });
+    const bar = { key: `bar-${i.key}`, ref, tone, y: top + 16, h: 8, label: '', sprintId, focus: false };
     if (i.statusCategory === 'done') {
       const end = i.resolved ? day(i.resolved) + 1 : to;
       const start = i.started ? day(i.started) : Math.max(from, end - 1);
@@ -179,7 +181,7 @@ export function buildScene(o: Overview): Scene {
     }
     if (i.due) {
       const late = i.statusCategory !== 'done' && i.due < o.today;
-      items.push({ key: `due-${i.key}`, ref, shape: 'diamond', tone: late ? 'danger' : 'warning', start: day(i.due), end: day(i.due), y: top + 14, h: 12, label: '', title: `${i.key} due ${i.due}`, sprintId, live: late });
+      items.push({ key: `due-${i.key}`, ref, shape: 'diamond', tone: late ? 'danger' : 'warning', start: day(i.due), end: day(i.due), y: top + 14, h: 12, label: '', title: `${i.key} due ${i.due}`, sprintId, live: late, focus: false });
     }
     return placeTasks(v.tasks, sprintId, top + ROW, o.refs);
   };
@@ -239,7 +241,7 @@ export function buildScene(o: Overview): Scene {
   if (o.backlog.length) {
     const from = today - 5;
     const to = today + 30;
-    items.push({ key: 'backlog', ref: { type: 'board', id: 'backlog' }, shape: 'row', tone: 'neutral', start: from, end: to, y: y + 2, h: 17, label: `backlog, ${o.backlog.length} in no sprint`, title: 'Your open issues that are in no sprint still to run', sprintId: null, live: false });
+    items.push({ key: 'backlog', ref: { type: 'list', id: 'backlog' }, shape: 'row', tone: 'neutral', start: from, end: to, y: y + 2, h: 17, label: `backlog, ${o.backlog.length} in no sprint`, title: 'Your open issues that are in no sprint still to run', sprintId: null, live: false });
     y += 24;
     for (const v of o.backlog) y = placeIssue(v, null, from, to, y);
     y += GAP;
@@ -250,7 +252,7 @@ export function buildScene(o: Overview): Scene {
   const laneEnds: number[] = [];
   for (const e of o.events) {
     if (!e.at) continue;
-    const at = day(e.at);
+    const at = day(localDay(e.at));
     last = Math.max(last, at + 14);
     let lane = laneEnds.findIndex((end) => end < at);
     if (lane === -1) {
@@ -259,13 +261,13 @@ export function buildScene(o: Overview): Scene {
     }
     laneEnds[lane] = at + Math.ceil(e.title.length / 4) + 2;
     const open = e.agenda.filter((a) => a.status === 'open').length;
-    items.push({ key: `event-${e.id}`, ref: { type: 'event', id: e.id }, shape: 'flag', tone: 'primary', start: at, end: at, y: y + lane * 22, h: 26, label: e.title, title: `${e.title}, ${e.at.slice(0, 16).replace('T', ' ')}${open ? `, ${open} to raise` : ''}`, sprintId: null, live: false });
+    items.push({ key: `event-${e.id}`, ref: { type: 'event', id: e.id }, shape: 'flag', tone: 'primary', start: at, end: at, y: y + lane * 22, h: 26, label: e.title, title: `${e.title}, ${formatDateTime(e.at)}${open ? `, ${open} to raise` : ''}`, sprintId: null, live: false });
   }
   if (laneEnds.length) y += laneEnds.length * 22 + GAP;
 
   // Work of yours that is in no sprint and serves no issue.
   if (o.unplaced.length) {
-    items.push({ key: 'unplaced', ref: { type: 'board', id: 'unplaced' }, shape: 'row', tone: 'neutral', start: today - 5, end: today + 30, y: y + 2, h: 17, label: 'your own, in no sprint', title: 'Your tasks that are in no sprint and serve no issue', sprintId: null, live: false });
+    items.push({ key: 'unplaced', ref: { type: 'list', id: 'unplaced' }, shape: 'row', tone: 'neutral', start: today - 5, end: today + 30, y: y + 2, h: 17, label: 'your own, in no sprint', title: 'Your tasks that are in no sprint and serve no issue', sprintId: null, live: false });
     y = placeTasks(o.unplaced, null, y + 26, o.refs);
   }
 

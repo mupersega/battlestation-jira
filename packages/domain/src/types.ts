@@ -7,8 +7,6 @@
 
 import type { ISODate, ISODateTime } from "./dates.js";
 import type { IssueSnapshot, SprintSnapshot } from "./jira.js";
-
-// ---------------------------------------------------------------------------
 // Your own work
 
 export type TaskStatus = "todo" | "doing" | "blocked" | "done" | "dropped";
@@ -44,8 +42,6 @@ export interface Task {
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }
-
-// ---------------------------------------------------------------------------
 // Meetings
 
 export type EventKind = "planning" | "refinement" | "review" | "retro" | "one_on_one" | "meeting" | "deadline";
@@ -80,8 +76,6 @@ export interface AgendaItem {
   /** An issue the point is about, by key. */
   issueKey: string | null;
 }
-
-// ---------------------------------------------------------------------------
 // Your notes on Jira issues
 
 /**
@@ -96,8 +90,6 @@ export interface IssueNote {
   seenUpdated: ISODateTime | null;
   updatedAt: ISODateTime;
 }
-
-// ---------------------------------------------------------------------------
 // Settings
 
 export interface JiraSettings {
@@ -139,8 +131,6 @@ export const DEFAULT_SETTINGS: Settings = {
   staleAfterDays: 4,
   taskTypes: [...DEFAULT_TASK_TYPES],
 };
-
-// ---------------------------------------------------------------------------
 // The record of changes
 
 export interface AuditEntry {

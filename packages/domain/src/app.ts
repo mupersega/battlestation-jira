@@ -93,8 +93,6 @@ export class Battlestation {
     this.onWrite?.(this.store.snapshot());
     return out;
   }
-
-  // -------------------------------------------------------------------------
   // Settings
 
   getSettings(): Settings {
@@ -137,8 +135,6 @@ export class Battlestation {
       return { id: "settings", result: next, detail: Object.keys(patch).join(", ") };
     });
   }
-
-  // -------------------------------------------------------------------------
   // The whole picture
 
   getOverview(): Overview {
@@ -164,8 +160,6 @@ export class Battlestation {
   listSprints(): SprintSnapshot[] {
     return this.store.listSprints();
   }
-
-  // -------------------------------------------------------------------------
   // Your own tasks
 
   listTasks(): Task[] {
@@ -246,8 +240,6 @@ export class Battlestation {
       return { id: task.id, result: task, detail: `${existing.status} -> ${task.status}` };
     });
   }
-
-  // -------------------------------------------------------------------------
   // Meetings
 
   listEvents(includeClosed = false): Array<Event & { agenda: AgendaItem[] }> {
@@ -311,8 +303,6 @@ export class Battlestation {
       return { id: item.id, result: item };
     });
   }
-
-  // -------------------------------------------------------------------------
   // Your notes on Jira issues
 
   private requireIssue(key: string): IssueSnapshot {
@@ -344,8 +334,6 @@ export class Battlestation {
       return { id: issues.map((i) => i.key).join(","), result: issues.map((i) => i.key), detail: `${issues.length} seen` };
     });
   }
-
-  // -------------------------------------------------------------------------
   // Pulling from Jira
 
   /**
@@ -382,8 +370,6 @@ export class Battlestation {
       return { id: "jira", result, detail: `${result.added.length} new, ${result.changed.length} changed, ${result.released.length} released` };
     });
   }
-
-  // -------------------------------------------------------------------------
   // The record
 
   listAudit(limit = 50) {

@@ -10,15 +10,15 @@
     <div class="id">
       <i class="ink slide-in-left ink-title-1"></i>
       <button type="button" class="name" (click)="pick({ type: 'board', id: 'board' })" title="The board and its settings">{{ o.title }}</button>
-      <span class="client">{{ o.subtitle }}</span>
+      <span class="subtitle">{{ o.subtitle }}</span>
     </div>
 
     @if (gauge(); as g) {
-      <button type="button" class="res" (click)="flyTo(g.ref)" [title]="'Your points in ' + g.name + ': done, in progress and to do' + (g.capacity !== null ? ', against a capacity of ' + g.capacity : '')">
-        <span class="res-bar" [class.over]="g.over">
-          <i class="paid" [style.width.%]="g.done.w"></i>
-          <i class="waiting" [style.width.%]="g.doing.w"></i>
-          <i class="todo" [style.width.%]="g.todo.w"></i>
+      <button type="button" class="points" (click)="flyTo(g.ref)" [title]="'Your points in ' + g.name + ': done, in progress and to do' + (g.capacity !== null ? ', against a capacity of ' + g.capacity : '')">
+        <span class="points-bar" [class.over]="g.over">
+          <i class="seg-done" [style.width.%]="g.done.w"></i>
+          <i class="seg-doing" [style.width.%]="g.doing.w"></i>
+          <i class="seg-todo" [style.width.%]="g.todo.w"></i>
           @if (g.expectedAt !== null) {
             <b class="expected" [style.left.%]="g.expectedAt" title="Where a straight line from start to finish says done should be by now"></b>
           }
@@ -26,13 +26,13 @@
             <b class="capacity" [style.left.%]="g.capacityAt" title="Your capacity"></b>
           }
         </span>
-        <span class="res-nums">
+        <span class="points-nums">
           <span class="sprint-name">{{ g.name }}</span>
-          <span class="paid"><b>{{ g.done.v }}</b> done</span>
-          <span class="waiting"><b>{{ g.doing.v }}</b> in progress</span>
+          <span class="seg-done"><b>{{ g.done.v }}</b> done</span>
+          <span class="seg-doing"><b>{{ g.doing.v }}</b> in progress</span>
           <span><b>{{ g.todo.v }}</b> to do</span>
           @if (g.unestimated) {
-            <span class="late"><b>{{ g.unestimated }}</b> unestimated</span>
+            <span class="seg-warn"><b>{{ g.unestimated }}</b> not estimated</span>
           }
           <span class="of" [class.bad]="g.over">of {{ g.committed }}{{ g.capacity !== null ? ', capacity ' + g.capacity : '' }}</span>
         </span>
@@ -94,7 +94,7 @@
     <section class="zone">
       <h2 class="zone-head tone-primary" title="Issues in progress, and your own tasks you have started."><i class="ink paint-in ink-head-1"></i>
         <app-icon name="hand" /><span>In hand</span><b>{{ work().length }}</b>
-        <button type="button" class="pull" (click)="newTask()" title="Write a task of your own. It goes under whatever is selected, if that can hold one.">New task</button>
+        <button type="button" class="minor" (click)="newTask()" title="Write a task of your own. It goes under whatever is selected, if that can hold one.">New task</button>
       </h2>
       @for (s of work(); track s.id) {
         <ng-container *ngTemplateOutlet="row; context: { $implicit: s, i: $index }" />
@@ -104,7 +104,7 @@
     </section>
 
     <section class="zone">
-      <h2 class="zone-head tone-warning" title="Conditions worked out from what Jira says and what you have recorded, not messages. Each goes by itself once the thing is dealt with."><i class="ink paint-in ink-head-2"></i><app-icon name="alert" /><span>Needs you</span><b>{{ needs().length }}</b></h2>
+      <h2 class="zone-head tone-warning" title="Worked out from what Jira says and what you have recorded. Each goes by itself once the thing is dealt with."><i class="ink paint-in ink-head-2"></i><app-icon name="alert" /><span>Needs you</span><b>{{ needs().length }}</b></h2>
       @for (s of needs(); track s.id) {
         <ng-container *ngTemplateOutlet="row; context: { $implicit: s, i: $index }" />
       } @empty {
@@ -116,28 +116,32 @@
       <h2 class="zone-head tone-info" title="Issues of yours that are new, or have changed in Jira since you last looked."><i class="ink paint-in ink-head-3"></i>
         <app-icon name="inbox" /><span>New to you</span><b>{{ inbox().length }}</b>
         @if (inbox().length) {
-          <button type="button" class="pull" [disabled]="saving()" (click)="seen('all')" title="Mark them all as seen as they are now">All seen</button>
-        } @else if (live()) {
-          <button type="button" class="pull" [disabled]="pulling()" (click)="pull()" title="Read your issues from Jira again. Nothing is written to Jira.">{{ pulling() ? 'Reading' : 'Pull' }}</button>
+          <button type="button" class="minor" [disabled]="saving()" (click)="seen('all')" title="Mark them all as seen as they are now">All seen</button>
+        }
+        @if (live()) {
+          <button type="button" class="minor" [disabled]="pulling()" (click)="pull()" title="Read your issues from Jira again. Nothing is written to Jira.">{{ pulling() ? 'Pulling' : 'Pull' }}</button>
         }
       </h2>
       <p class="zone-note">
         @if (!inbox().length) {
           Nothing new.
         }
-        @if (pullSaid(); as p) {
-          <span [class.bad]="!p.ok">{{ p.said }}.</span>
+        @if (pullNote(); as p) {
+          <span [class.bad]="!p.ok">{{ p.text }}</span>
         } @else if (pulledAt(); as at) {
-          Read from Jira {{ at }}.
+          Pulled {{ at }}.
         } @else {
-          Never read from Jira.
+          Never pulled from Jira.
         }
       </p>
+      @if (refusedFor('seen'); as why) {
+        <p class="refused" role="alert">{{ why }}</p>
+      }
       @for (t of inbox(); track t.key) {
-        <button type="button" appTilt [class]="'tk slide-in-left tone-' + t.tone" [class.on]="t.on" [style.--i]="$index" (click)="flyTo(t.ref)">
+        <button type="button" appTilt [class]="'entry slide-in-left tone-' + t.tone" [class.on]="t.on" [style.--i]="$index" (click)="flyTo(t.ref)">
           <span class="ref"><i class="slant"></i><app-icon name="issue" />{{ t.key }}</span>
-          <span class="tk-t">{{ t.title }}</span>
-          <span class="tk-w">{{ t.status }}</span>
+          <span class="entry-t">{{ t.title }}</span>
+          <span class="entry-w">{{ t.status }}</span>
         </button>
       }
     </section>
@@ -145,13 +149,13 @@
     <section class="zone">
       <h2 class="zone-head tone-neutral" title="Your meetings, soonest first."><i class="ink paint-in ink-head-2"></i>
         <app-icon name="event" /><span>Meetings</span><b>{{ meetings().length }}</b>
-        <button type="button" class="pull" (click)="newMeeting()" title="Put a meeting on the map">New meeting</button>
+        <button type="button" class="minor" (click)="newMeeting()" title="Put a meeting on the map">New meeting</button>
       </h2>
       @for (m of meetings(); track m.ref.id) {
-        <button type="button" appTilt class="tk done slide-in-left" [class.on]="m.on" [style.--i]="$index" (click)="flyTo(m.ref)">
+        <button type="button" appTilt class="entry meeting tone-primary slide-in-left" [class.on]="m.on" [style.--i]="$index" (click)="flyTo(m.ref)">
           <span class="ref"><i class="slant"></i><app-icon name="event" />{{ m.badge }}</span>
-          <span class="tk-t">{{ m.title }}</span>
-          <span class="tk-w">{{ m.when }}{{ m.open ? ', ' + m.open + ' to raise' : '' }}</span>
+          <span class="entry-t">{{ m.title }}</span>
+          <span class="entry-w">{{ m.when }}{{ m.open ? ', ' + m.open + ' to raise' : '' }}</span>
         </button>
       } @empty {
         <p class="zone-note">None planned.</p>
@@ -189,11 +193,12 @@
           @for (it of drawn(); track it.key) {
             <g
               [class]="it.cls"
-              tabindex="0"
+              [attr.tabindex]="it.tab"
               role="button"
               [attr.aria-label]="it.title"
               (click)="pick(it.ref, $event)"
-              (keydown.enter)="pick(it.ref)"
+              (keydown.enter)="press(it.ref, $event)"
+              (keydown.space)="press(it.ref, $event)"
               (pointerenter)="hover(it)"
               (pointerleave)="hover(null)"
               (focus)="hover(it)"
@@ -205,12 +210,6 @@
                 }
                 @case ('flag') {
                   <polygon [attr.points]="it.pts" />
-                }
-                @case ('outline') {
-                  <rect [attr.x]="it.x" [attr.y]="it.y" [attr.width]="it.w" [attr.height]="it.h" rx="1.5" />
-                }
-                @case ('dot') {
-                  <circle [attr.cx]="it.x" [attr.cy]="it.y + it.h / 2" r="5" />
                 }
                 @case ('diamond') {
                   <rect [attr.x]="it.x - 5" [attr.y]="it.y" width="10" height="10" [attr.transform]="'rotate(45 ' + it.x + ' ' + (it.y + 5) + ')'" />
@@ -229,7 +228,7 @@
           }
 
           @for (l of rowLabels(); track l.key) {
-            <g [class]="l.cls" tabindex="0" role="button" [attr.aria-label]="l.text" (click)="pick(l.ref, $event)" (keydown.enter)="pick(l.ref)">
+            <g [class]="l.cls" tabindex="0" role="button" [attr.aria-label]="l.text" (click)="pick(l.ref, $event)" (keydown.enter)="press(l.ref, $event)" (keydown.space)="press(l.ref, $event)">
               <rect [attr.x]="l.x" [attr.y]="l.y - 9" width="9" height="9" rx="1" />
               <text [attr.x]="l.x + 15" [attr.y]="l.y">{{ l.text }}</text>
             </g>
@@ -238,6 +237,11 @@
           <rect class="beam" [attr.x]="todayX() - 11" y="0" width="22" height="100%" />
           <rect class="now" [attr.x]="todayX() - 1" y="0" width="2" height="100%" />
         </svg>
+      }
+      @if (!o.sprints.length && !o.backlog.length) {
+        <p class="empty">
+          Nothing to draw yet. Put your Jira address and credentials in <b>.env</b>, set your board by selecting <b>{{ o.title }}</b> at the top left, then <b>Pull</b>.
+        </p>
       }
     </div>
 
@@ -252,10 +256,10 @@
 
   <aside class="right" aria-label="Selected">
     @if (taskDraft(); as n) {
-      <form class="sorter" (submit)="$event.preventDefault(); saveTask()">
-        <p class="kind"><app-icon name="task" /><span>A task of your own</span></p>
+      <form class="form" (submit)="$event.preventDefault(); saveTask()">
+        <p class="kind"><app-icon name="task" /><span>{{ n.id ? 'Your task' : 'A task of your own' }}</span></p>
         <label>
-          <span>Called</span>
+          <span>Title</span>
           <input type="text" [value]="n.title" (input)="editTask('title', value($event))" />
         </label>
         <label>
@@ -280,19 +284,19 @@
           <span>What has to be done, and how to tell it is done</span>
           <textarea rows="5" [value]="n.description" (input)="editTask('description', value($event))" placeholder="Can be filled in later."></textarea>
         </label>
-        @if (refused(); as why) {
+        @if (refusedFor('task'); as why) {
           <p class="refused" role="alert">{{ why }}</p>
         }
         <div class="actions">
-          <button type="submit" class="save" [disabled]="saving()">{{ saving() ? 'Saving' : 'Add the task' }}</button>
-          <button type="button" class="undo" (click)="taskDraft.set(null)">Put it down</button>
+          <button type="submit" class="save" [disabled]="saving()">{{ saving() ? 'Saving' : n.id ? 'Save task' : 'Add task' }}</button>
+          <button type="button" class="undo" (click)="taskDraft.set(null)">Cancel</button>
         </div>
       </form>
     } @else if (meetingDraft(); as m) {
-      <form class="sorter" (submit)="$event.preventDefault(); saveMeeting()">
+      <form class="form" (submit)="$event.preventDefault(); saveMeeting()">
         <p class="kind"><app-icon name="event" /><span>A meeting</span></p>
         <label>
-          <span>Called</span>
+          <span>Title</span>
           <input type="text" [value]="m.title" (input)="editMeeting('title', value($event))" />
         </label>
         <label>
@@ -307,12 +311,12 @@
           <span>When, in your own time. Leave it empty if it is not booked yet.</span>
           <input type="datetime-local" [value]="m.when" (input)="editMeeting('when', value($event))" />
         </label>
-        @if (refused(); as why) {
+        @if (refusedFor('meeting'); as why) {
           <p class="refused" role="alert">{{ why }}</p>
         }
         <div class="actions">
-          <button type="submit" class="save" [disabled]="saving()">{{ saving() ? 'Saving' : 'Add the meeting' }}</button>
-          <button type="button" class="undo" (click)="meetingDraft.set(null)">Put it down</button>
+          <button type="submit" class="save" [disabled]="saving()">{{ saving() ? 'Saving' : 'Add meeting' }}</button>
+          <button type="button" class="undo" (click)="meetingDraft.set(null)">Cancel</button>
         </div>
       </form>
     } @else {
@@ -360,7 +364,7 @@
       @if (d.issue; as i) {
         <div class="actions">
           @if (d.jira) {
-            <a class="pdf" [href]="d.jira" target="_blank" rel="noopener">Open in Jira</a>
+            <a class="jira-link" [href]="d.jira" target="_blank" rel="noopener">Open in Jira</a>
           }
           @if (i.fresh) {
             <button type="button" class="save" [disabled]="saving()" (click)="seen([i.key])">Seen</button>
@@ -372,33 +376,48 @@
         <div class="actions">
           @switch (t.status) {
             @case ('todo') {
-              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'doing')">Start it</button>
+              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'doing')">Start</button>
             }
             @case ('doing') {
-              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'done')">Finish it</button>
-              <button type="button" class="undo" [disabled]="saving()" (click)="move(t.id, 'todo')">Put it back in the queue</button>
+              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'done')">Finish</button>
+              <button type="button" class="undo" [disabled]="saving()" (click)="move(t.id, 'todo')">Back to the queue</button>
             }
             @case ('blocked') {
-              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'doing')">Back in hand</button>
+              <button type="button" class="save" [disabled]="saving()" (click)="move(t.id, 'doing')">Unblock</button>
             }
             @case ('done') {
               <button type="button" class="undo" [disabled]="saving()" (click)="move(t.id, 'doing')">Not finished after all</button>
             }
           }
-          @if (refused(); as why) {
-            <span class="refused" role="alert">{{ why }}</span>
+          <button type="button" class="undo" (click)="changeTask(t.id)">Edit</button>
+          @if (t.status !== 'done' && t.status !== 'blocked' && blockReason() === null) {
+            <button type="button" class="undo" (click)="blockReason.set('')">Blocked</button>
           }
+          <button type="button" class="undo" [disabled]="saving()" (click)="drop(t.id, d.title)">Drop</button>
         </div>
+        @if (blockReason() !== null) {
+          <form class="actions" (submit)="$event.preventDefault(); block(t.id)">
+            <input class="block-reason" type="text" [value]="blockReason()" (input)="blockReason.set(value($event))" placeholder="What it is waiting on" aria-label="What it is waiting on" />
+            <button type="submit" class="save" [disabled]="saving()">Mark blocked</button>
+            <button type="button" class="undo" (click)="blockReason.set(null)">Cancel</button>
+          </form>
+        }
+        @if (refusedFor('task-status'); as why) {
+          <p class="refused" role="alert">{{ why }}</p>
+        }
       }
 
       @if (d.meeting; as m) {
-        <form class="sorter" (submit)="$event.preventDefault(); setDate(m.id)">
+        <form class="form" (submit)="$event.preventDefault(); setDate(m.id)">
           <label>
             <span>When, in your own time</span>
             <input type="datetime-local" [value]="when()" (input)="when.set(value($event))" />
           </label>
+          @if (refusedFor('date'); as why) {
+            <p class="refused" role="alert">{{ why }}</p>
+          }
           <div class="actions">
-            <button type="submit" class="save" [disabled]="saving()">{{ m.at ? 'Change the date' : 'Set the date' }}</button>
+            <button type="submit" class="save" [disabled]="saving()">{{ m.at ? 'Change date' : 'Set date' }}</button>
             @if (m.at) {
               <button type="button" class="undo" [disabled]="saving()" (click)="happened(m.id, d.title)">It happened</button>
             }
@@ -448,16 +467,16 @@
       }
 
       @if (d.issue; as i) {
-        <form class="sorter" (submit)="$event.preventDefault(); saveNote(i.key)">
+        <form class="form" (submit)="$event.preventDefault(); saveNote(i.key)">
           <label>
             <span>Your note. It stays here and is never sent to Jira.</span>
             <textarea rows="3" [value]="note()" (input)="note.set(value($event))" placeholder="What you want to remember about it."></textarea>
           </label>
-          @if (refused(); as why) {
+          @if (refusedFor('note'); as why) {
             <p class="refused" role="alert">{{ why }}</p>
           }
           <div class="actions">
-            <button type="submit" class="save" [disabled]="saving() || note() === i.note">Keep the note</button>
+            <button type="submit" class="save" [disabled]="saving() || note() === i.note">Save note</button>
           </div>
         </form>
       }
@@ -471,7 +490,18 @@
                 <q>{{ a.answer }}</q>
               }
               @if (d.meeting) {
-                <button type="button" class="answer" (click)="answer(a.id, a.answer)">{{ a.answer ? 'Change the answer' : 'Answer it' }}</button>
+                @if (answering()?.id === a.id) {
+                  <form class="answering" (submit)="$event.preventDefault(); saveAnswer()">
+                    <textarea rows="2" [value]="answering()!.text" (input)="answering.set({ id: a.id, text: value($event) })" aria-label="The answer"></textarea>
+                    <div class="actions">
+                      <button type="submit" class="save" [disabled]="saving()">Save answer</button>
+                      <button type="button" class="undo" [disabled]="saving()" (click)="dropPoint(a.id)">Drop the point</button>
+                      <button type="button" class="undo" (click)="answering.set(null)">Cancel</button>
+                    </div>
+                  </form>
+                } @else {
+                  <button type="button" class="answer" (click)="answering.set({ id: a.id, text: a.answer ?? '' })">{{ a.answer ? 'Change the answer' : 'Answer' }}</button>
+                }
               }
             </li>
           }
@@ -479,57 +509,64 @@
       }
 
       @if (d.meeting; as m) {
-        <form class="sorter" (submit)="$event.preventDefault(); raise(m.id)">
+        <form class="form" (submit)="$event.preventDefault(); raise(m.id)">
           <label>
             <span>Something to raise. Name an issue by its key to tie it to that issue.</span>
             <textarea rows="3" [value]="point()" (input)="point.set(value($event))" placeholder="A question or a point, as you would put it."></textarea>
           </label>
-          @if (refused(); as why) {
+          @if (refusedFor('agenda'); as why) {
             <p class="refused" role="alert">{{ why }}</p>
           }
           <div class="actions">
-            <button type="submit" class="save" [disabled]="saving()">Add to the agenda</button>
+            <button type="submit" class="save" [disabled]="saving()">Add to agenda</button>
           </div>
         </form>
       }
 
       @if (d.settings) {
         @if (settingsDraft(); as sd) {
-          <form class="sorter" (submit)="$event.preventDefault(); saveSettings()">
+          <form class="form" (submit)="$event.preventDefault(); saveSettings()">
             <label>
-              <span>Called</span>
+              <span>Title</span>
               <input type="text" [value]="sd.title" (input)="editSettings('title', value($event))" />
             </label>
             <label>
-              <span>Beside it</span>
+              <span>Subtitle</span>
               <input type="text" [value]="sd.subtitle" (input)="editSettings('subtitle', value($event))" />
             </label>
             <label>
-              <span>Capacity, in points a sprint</span>
+              <span>Capacity, in points a sprint. Empty for none.</span>
               <input type="number" min="1" step="1" [value]="sd.capacity" (input)="editSettings('capacity', value($event))" />
             </label>
             <label>
-              <span>In progress for more working days than this is called out</span>
+              <span>An issue in progress for more working days than this is called out</span>
               <input type="number" min="1" step="1" [value]="sd.stale" (input)="editSettings('stale', value($event))" />
             </label>
             <label>
-              <span>Board id, to change it</span>
-              <input type="text" [value]="sd.board" (input)="editSettings('board', value($event))" placeholder="The number in the board's address" />
+              <span>Board id: the number in the board's address in Jira</span>
+              <input type="text" [value]="sd.board" (input)="editSettings('board', value($event))" placeholder="No board: only the sprints your issues are in" />
             </label>
             <label>
-              <span>Which issues are read (JQL), to change it</span>
-              <input type="text" [value]="sd.jql" (input)="editSettings('jql', value($event))" placeholder="Empty reads your own, open or recently resolved" />
+              <span>Which issues are read, in JQL</span>
+              <input type="text" [value]="sd.jql" (input)="editSettings('jql', value($event))" placeholder="Empty: yours, open or resolved in the last six weeks" />
+            </label>
+            <label>
+              <span>The team's time zone, for the days sprints start and end</span>
+              <input type="text" [value]="sd.timeZone" (input)="editSettings('timeZone', value($event))" placeholder="Empty: this computer's. Or a name such as Australia/Brisbane" />
             </label>
             <p class="hint">The Jira address and credentials are never kept here. They are read from the .env file when a pull runs.</p>
-            @if (refused(); as why) {
+            @if (refusedFor('settings'); as why) {
               <p class="refused" role="alert">{{ why }}</p>
             }
             <div class="actions">
-              <button type="submit" class="save" [disabled]="saving()">Keep the settings</button>
+              <button type="submit" class="save" [disabled]="saving()">Save settings</button>
               @if (live()) {
-                <button type="button" class="undo" [disabled]="pulling()" (click)="pull()">{{ pulling() ? 'Reading' : 'Pull from Jira' }}</button>
+                <button type="button" class="undo" [disabled]="pulling()" (click)="pull()">{{ pulling() ? 'Pulling' : 'Pull' }}</button>
               }
             </div>
+            @if (pullNote(); as p) {
+              <p class="hint" [class.refused]="!p.ok">{{ p.text }}</p>
+            }
           </form>
         }
       }
@@ -557,12 +594,18 @@
                 <span>{{ l.text }}</span>
                 <em>{{ l.note }}</em>
               </button>
-            } @else {
+            } @else if (l.href) {
               <a appTilt [class]="'link tone-' + l.tone" [attr.href]="l.href" target="_blank" rel="noopener">
                 <span class="ref"><i class="slant"></i><app-icon [name]="l.icon" />{{ l.badge }}</span>
                 <span>{{ l.text }}</span>
                 <em>{{ l.note }}</em>
               </a>
+            } @else {
+              <p [class]="'link tone-' + l.tone">
+                <span class="ref"><i class="slant"></i><app-icon [name]="l.icon" />{{ l.badge }}</span>
+                <span>{{ l.text }}</span>
+                <em>{{ l.note }}</em>
+              </p>
             }
           }
         </div>

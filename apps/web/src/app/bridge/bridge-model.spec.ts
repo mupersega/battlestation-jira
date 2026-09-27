@@ -79,7 +79,7 @@ describe('the scene', () => {
     expect(i.issue!.fresh).toBe(true);
     expect(describeRef(o, { type: 'task', id: 't1' })!.task!.status).toBe('doing');
     expect(describeRef(o, { type: 'event', id: 'e1' })!.meeting!.id).toBe('e1');
-    expect(describeRef(o, { type: 'board', id: 'backlog' })!.links.length).toBe(1);
+    expect(describeRef(o, { type: 'list', id: 'backlog' })!.links.length).toBe(1);
     expect(describeRef(o, { type: 'board', id: 'board' })!.settings).toBe(true);
     expect(describeRef(o, { type: 'issue', id: 'nope' })).toBeNull();
   });
