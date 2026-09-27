@@ -36,6 +36,11 @@ Start with `npm run mock`. It builds a throwaway database from `packages/api/src
 
 ## Connecting to Jira
 
+For a new computer, `SETUP.md` goes step by step from a fresh clone to the first pull and a check of what it read. With Claude Code, open it in this folder and ask it to set the computer up: the `setup` skill in `.claude/skills/setup` walks through the same steps.
+
+In short:
+
+
 1. Copy `.env.example` to `.env` and fill it in. For Jira Cloud that is your site address, your email and an API token. For Jira Data Center it is the site address and a personal access token. `.env` is git-ignored; the credentials are only read when a pull runs, and are never stored in the database or shown on screen.
 2. Find your board's id: it is the number in the board's address in Jira (`.../boards/12`).
 3. Run the first pull with it: `npm run pull -- --board 12`. The board is remembered.
