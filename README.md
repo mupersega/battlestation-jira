@@ -43,6 +43,8 @@ Start with `npm run mock`. It builds a throwaway database from `packages/api/src
 
 By default the pull reads the issues assigned to you that are open, or were resolved in the last six weeks. To read something else, give it a JQL query: `npm run pull -- --jql "project = ABC AND assignee = currentUser()"`. It is remembered too. Both can also be changed on the screen by selecting the name at the top left.
 
+The Jira address is only ever taken from `.env`, next to the credentials, so that nothing that can change the settings can send your token elsewhere.
+
 Story points and sprints are found in Jira's own field list; if yours are named unusually, set their field ids with the MCP tool `update_settings` (`points_field`, `sprint_field`).
 
 What the pull does, exactly: GET requests only, to the current user, the field list, the status list, the board's configuration and sprints, and the issue search (with each issue's history, to find when it went into progress). It retries politely when Jira says too many requests. On Jira Cloud it uses the enhanced search (`/rest/api/3/search/jql`); on Data Center, `/rest/api/2/search`.
@@ -61,6 +63,8 @@ Start with the `get_today` tool.
 
 `BATTLESTATION_DATA_DIR` (default `~/.battlestation-jira`) holds `battlestation.sqlite` and `export/battlestation.json`, a readable copy of everything written after every change. Nothing about your work is kept in this repository.
 
+Both files hold copies of your issues and their comments, in plain form. On a work computer, keep them where your employer allows their data to be, and back them up only to somewhere that is allowed too.
+
 ## Layout
 
 - `packages/domain`: the entities, the copies of Jira issues and sprints, the overview (sprints, points, signals, life cycles) and the application service. No I/O.
@@ -77,4 +81,4 @@ Start with the `get_today` tool.
 - Three levels, never mixed: an issue is Jira's, a task is your own breakdown of the work, a meeting is yours.
 - Stored fields are facts; statuses such as stale, behind or over capacity are worked out every time, never stored.
 - Every change is recorded with who or what made it.
-- The local server answers only to this machine. It accepts a change only as JSON from its own pages, and refuses any request that names another host.
+- The local server answers only to this machine. It accepts a change only as JSON from its own pages (same host and port), refuses any request that names another host, and cannot be framed by another page.

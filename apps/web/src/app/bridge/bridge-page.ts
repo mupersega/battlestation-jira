@@ -431,7 +431,7 @@ export class BridgePage {
   protected readonly point = signal('');
   protected readonly taskDraft = signal<TaskDraft | null>(null);
   protected readonly meetingDraft = signal<MeetingDraft | null>(null);
-  protected readonly settingsDraft = signal<{ title: string; subtitle: string; capacity: string; stale: string; board: string; jql: string; site: string } | null>(null);
+  protected readonly settingsDraft = signal<{ title: string; subtitle: string; capacity: string; stale: string; board: string; jql: string } | null>(null);
   protected readonly kinds = KINDS;
 
   protected value(event: Event): string {
@@ -550,10 +550,10 @@ export class BridgePage {
   }
 
   private settingsFrom(o: Overview) {
-    return { title: o.title, subtitle: o.subtitle, capacity: o.capacity === null ? '' : String(o.capacity), stale: String(o.staleAfterDays), board: '', jql: '', site: o.jiraUrl ?? '' };
+    return { title: o.title, subtitle: o.subtitle, capacity: o.capacity === null ? '' : String(o.capacity), stale: String(o.staleAfterDays), board: '', jql: '' };
   }
 
-  protected editSettings(field: 'title' | 'subtitle' | 'capacity' | 'stale' | 'board' | 'jql' | 'site', value: string): void {
+  protected editSettings(field: 'title' | 'subtitle' | 'capacity' | 'stale' | 'board' | 'jql', value: string): void {
     this.settingsDraft.update((d) => (d ? { ...d, [field]: value } : d));
   }
 
@@ -569,7 +569,6 @@ export class BridgePage {
         subtitle: d.subtitle,
         capacityPoints: capacity,
         staleAfterDays: Number.isFinite(stale) ? stale : undefined,
-        jiraBaseUrl: d.site.trim() || null,
         ...(d.board.trim() ? { boardId: d.board.trim() } : {}),
         ...(d.jql.trim() ? { jql: d.jql.trim() } : {}),
       }),

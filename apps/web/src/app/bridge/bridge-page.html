@@ -513,10 +513,6 @@
               <input type="number" min="1" step="1" [value]="sd.stale" (input)="editSettings('stale', value($event))" />
             </label>
             <label>
-              <span>Jira address</span>
-              <input type="url" [value]="sd.site" (input)="editSettings('site', value($event))" placeholder="https://your-site.atlassian.net" />
-            </label>
-            <label>
               <span>Board id, to change it</span>
               <input type="text" [value]="sd.board" (input)="editSettings('board', value($event))" placeholder="The number in the board's address" />
             </label>
@@ -524,7 +520,7 @@
               <span>Which issues are read (JQL), to change it</span>
               <input type="text" [value]="sd.jql" (input)="editSettings('jql', value($event))" placeholder="Empty reads your own, open or recently resolved" />
             </label>
-            <p class="hint">The Jira credentials are never kept here. They are read from the .env file when a pull runs.</p>
+            <p class="hint">The Jira address and credentials are never kept here. They are read from the .env file when a pull runs.</p>
             @if (refused(); as why) {
               <p class="refused" role="alert">{{ why }}</p>
             }

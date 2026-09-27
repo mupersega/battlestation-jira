@@ -2,6 +2,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { request, type Server } from "node:http";
+import { connect } from "node:net";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -75,6 +76,9 @@ test("changes come only as JSON from the app's own pages", async () => {
   assert.equal((await post("/api/issues/note", { key, note: "x" }, { "content-type": "application/json", origin: "https://elsewhere.test" })).status, 403);
   assert.equal((await post("/api/issues/note", { key, note: "x" }, { "content-type": "text/plain" })).status, 403);
   assert.equal((await post("/api/issues/note", { key, note: "x" }, { "content-type": "application/json", "sec-fetch-site": "cross-site" })).status, 403);
+  // Another page on this machine, on another port, is not one of ours.
+  assert.equal((await post("/api/issues/note", { key, note: "x" }, { "content-type": "application/json", origin: "http://127.0.0.1:3000" })).status, 403);
+  assert.equal((await post("/api/issues/note", { key, note: "x" }, { "content-type": "application/json", "sec-fetch-site": "same-site" })).status, 403);
   assert.equal((await post("/api/issues/note", [1, 2])).status, 400);
   const ok = await post("/api/issues/note", { key, note: "Wire to the new events schema" }, { "content-type": "application/json", origin: base });
   assert.equal(ok.status, 200);
@@ -114,7 +118,7 @@ test("seen, tasks, meetings and settings from the screen", async () => {
 test("a pull with no connection says what is missing", async () => {
   const r = await post("/api/jira/pull", {});
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /credentials/);
+  assert.match(r.body.error, /No Jira address/);
 });
 
 test("static files, the app shell, bad addresses, and no way out of the web folder", async () => {
@@ -122,6 +126,8 @@ test("static files, the app shell, bad addresses, and no way out of the web fold
   assert.equal(css.status, 200);
   assert.match(css.type, /text\/css/);
   assert.equal(css.keep, "no-cache");
+  const page = await fetch(base + "/");
+  assert.equal(page.headers.get("x-frame-options"), "DENY");
   assert.match((await get("/assets/app.css?v=0123abcd")).keep, /immutable/);
   const shell = await get("/sprints");
   assert.match(shell.body, /<title>shell<\/title>/);
@@ -130,4 +136,16 @@ test("static files, the app shell, bad addresses, and no way out of the web fold
   assert.match(escape.body, /<title>shell<\/title>/);
   assert.equal((await get("/api/nothing")).status, 404);
   assert.equal((await fetch(base + "/api/overview", { method: "DELETE" })).status, 405);
+});
+
+test("a request target that is not an address is refused, and the server keeps going", async () => {
+  const answer = await new Promise<string>((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1", () => socket.write("GET http://[/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"));
+    let got = "";
+    socket.on("data", (d) => (got += d.toString()));
+    socket.on("end", () => resolve(got));
+    socket.on("error", reject);
+  });
+  assert.match(answer, /^HTTP\/1\.1 400/);
+  assert.equal((await get("/api/health")).status, 200);
 });

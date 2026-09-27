@@ -220,7 +220,9 @@ test("the connection comes from the environment, and refuses to send a token in 
     deployment: "cloud",
     auth: { email: "a@b.c", token: "t" },
   });
-  assert.equal(connectionFromEnv({ JIRA_PAT: "p" }, "https://jira.example.com").deployment, "datacenter");
+  assert.equal(connectionFromEnv({ JIRA_BASE_URL: "https://jira.example.com", JIRA_PAT: "p" }).deployment, "datacenter");
+  assert.throws(() => connectionFromEnv({ JIRA_BASE_URL: "https://me:secret@jira.example.com", JIRA_PAT: "p" }), /not in the address/);
+  assert.throws(() => connectionFromEnv({ JIRA_PAT: "p" }), /No Jira address/, "the settings never supply the address");
   assert.throws(() => connectionFromEnv({ JIRA_BASE_URL: "http://jira.example.com", JIRA_PAT: "p" }), /https/);
   assert.throws(() => connectionFromEnv({ JIRA_BASE_URL: "https://x.example.com" }), /credentials/);
   assert.throws(() => connectionFromEnv({}), /No Jira address/);

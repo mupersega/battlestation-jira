@@ -61,7 +61,7 @@ export class Api {
     return this.write('/api/events/agenda/update', body);
   }
 
-  saveSettings(body: { title?: string; subtitle?: string; capacityPoints?: number | null; staleAfterDays?: number; jiraBaseUrl?: string | null; boardId?: string | null; jql?: string }) {
+  saveSettings(body: { title?: string; subtitle?: string; capacityPoints?: number | null; staleAfterDays?: number; boardId?: string | null; jql?: string }) {
     return this.write('/api/settings', body);
   }
 

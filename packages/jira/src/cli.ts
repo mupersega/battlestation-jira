@@ -24,7 +24,7 @@ try {
   const board = option("board");
   const jql = option("jql");
   if (board !== undefined || jql !== undefined) app.updateSettings("cli", { jira: { ...(board !== undefined ? { boardId: board } : {}), ...(jql !== undefined ? { jql } : {}) } });
-  const connection = connectionFromEnv(process.env, app.getSettings().jira.baseUrl);
+  const connection = connectionFromEnv(process.env);
   const r = await pullFromJira(app, { connection, actor: "cli" });
   const o = app.getOverview();
   console.log(`Read from ${connection.baseUrl} for ${r.me}: ${r.added.length} new, ${r.changed.length} changed, ${r.released.length} no longer yours, ${r.sprints} sprints.`);

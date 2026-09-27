@@ -168,7 +168,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
     },
     async (_a, ctx) => {
       try {
-        const connection = connectionFromEnv(env, app.getSettings().jira.baseUrl);
+        const connection = connectionFromEnv(env);
         const r = await pullFromJira(app, { connection, fetch, actor: actorOf(ctx) });
         return text(`Read for ${r.me}: ${r.added.length} new, ${r.changed.length} changed, ${r.released.length} no longer yours, ${r.sprints} sprints.`);
       } catch (err) {
@@ -275,7 +275,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
 
   server.registerTool(
     "get_settings",
-    { description: "The settings: title, Jira address, board and query, capacity in points, when in-progress counts as stale, task types. Never credentials.", inputSchema: z.object({}), annotations: READ_ONLY },
+    { description: "The settings: title, board and query, capacity in points, when in-progress counts as stale, task types. The Jira address and credentials come from the environment, never from here.", inputSchema: z.object({}), annotations: READ_ONLY },
     async () => json(app.getSettings()),
   );
 
@@ -286,7 +286,6 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
       inputSchema: z.object({
         title: z.string().optional(),
         subtitle: z.string().optional(),
-        jira_base_url: z.string().nullable().optional(),
         board_id: z.string().nullable().optional(),
         jql: z.string().optional().describe("which issues are read; empty for your own, open or recently resolved"),
         points_field: z.string().nullable().optional(),
@@ -303,7 +302,7 @@ export function buildServer({ app, version, env = process.env, fetch }: ServerOp
           app.updateSettings(actorOf(ctx), {
             title: a.title,
             subtitle: a.subtitle,
-            jira: { baseUrl: a.jira_base_url, boardId: a.board_id, jql: a.jql, pointsField: a.points_field, sprintField: a.sprint_field },
+            jira: { boardId: a.board_id, jql: a.jql, pointsField: a.points_field, sprintField: a.sprint_field },
             capacityPoints: a.capacity_points,
             staleAfterDays: a.stale_after_days,
             taskTypes: a.task_types,

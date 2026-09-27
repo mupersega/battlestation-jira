@@ -9,6 +9,7 @@
  */
 
 import {
+  isIssueKey,
   richTextToPlain,
   statusCategoryOf,
   todayISO,
@@ -30,7 +31,7 @@ export interface JiraConnection {
   auth: { email: string; token: string } | { pat: string };
 }
 
-export type FetchLike = (url: string, init: { method: "GET"; headers: Record<string, string>; signal?: AbortSignal }) => Promise<{ status: number; headers: { get(name: string): string | null }; json(): Promise<unknown>; text(): Promise<string> }>;
+export type FetchLike = (url: string, init: { method: "GET"; headers: Record<string, string>; redirect: "error"; signal?: AbortSignal }) => Promise<{ status: number; headers: { get(name: string): string | null }; json(): Promise<unknown>; text(): Promise<string> }>;
 
 /** A request Jira refused, or a Jira that could not be reached. The message never holds a credential. */
 export class JiraError extends Error {
@@ -46,22 +47,28 @@ export class JiraError extends Error {
 /**
  * The connection, from the environment:
  *
- *   JIRA_BASE_URL    the site, such as https://example.atlassian.net (or the settings' address)
+ *   JIRA_BASE_URL    the site, such as https://example.atlassian.net
  *   JIRA_EMAIL       with JIRA_API_TOKEN, for Jira Cloud
  *   JIRA_API_TOKEN
  *   JIRA_PAT         a personal access token, for Jira Data Center
  *   JIRA_DEPLOYMENT  cloud or datacenter, when it cannot be told from the above
+ *
+ * The address comes from the same place as the credentials and nowhere
+ * else, so that nothing which can change the settings can send the token
+ * somewhere of its choosing.
  */
-export function connectionFromEnv(env: NodeJS.ProcessEnv, baseUrlFromSettings: string | null = null): JiraConnection {
-  const baseUrl = (env.JIRA_BASE_URL?.trim() || baseUrlFromSettings || "").replace(/\/+$/, "");
-  if (!baseUrl) throw new JiraError("No Jira address. Set JIRA_BASE_URL in .env, or the Jira address in the settings.");
+export function connectionFromEnv(env: NodeJS.ProcessEnv): JiraConnection {
+  const raw = env.JIRA_BASE_URL?.trim() ?? "";
+  if (!raw) throw new JiraError("No Jira address. Set JIRA_BASE_URL in .env.");
   let url: URL;
   try {
-    url = new URL(baseUrl);
+    url = new URL(raw);
   } catch {
-    throw new JiraError(`Not an address: ${baseUrl}`);
+    throw new JiraError("JIRA_BASE_URL is not an address.");
   }
   if (url.protocol !== "https:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") throw new JiraError("The Jira address must start with https://, so that the token is not sent in the clear.");
+  if (url.username || url.password) throw new JiraError("Put the credentials in JIRA_EMAIL and JIRA_API_TOKEN, or JIRA_PAT, not in the address.");
+  const baseUrl = (url.origin + url.pathname).replace(/\/+$/, "");
   const pat = env.JIRA_PAT?.trim();
   const email = env.JIRA_EMAIL?.trim();
   const token = env.JIRA_API_TOKEN?.trim();
@@ -102,7 +109,7 @@ export class JiraClient {
     for (let attempt = 0; ; attempt++) {
       let res;
       try {
-        res = await this.fetchImpl(url, { method: "GET", headers: this.headers(), signal: AbortSignal.timeout(30_000) });
+        res = await this.fetchImpl(url, { method: "GET", headers: this.headers(), redirect: "error", signal: AbortSignal.timeout(30_000) });
       } catch (err) {
         throw new JiraError(`Could not reach Jira at ${this.connection.baseUrl}: ${(err as Error).message}`);
       }
@@ -404,9 +411,9 @@ export async function pullFromJira(app: Battlestation, options: PullOptions): Pr
   }
 
   // On Data Center an epic is named by key only; read the names of those not already here.
-  const missing = [...epicKeys].filter((k) => !issues.some((i) => i.key === k));
+  const missing = [...epicKeys].filter((k) => isIssueKey(k) && !issues.some((i) => i.key === k));
   if (missing.length) {
-    const found = await client.search(`key in (${missing.map((k) => `"${k.replace(/"/g, "")}"`).join(",")})`, ["summary", "issuetype"], false).catch(() => []);
+    const found = await client.search(`key in (${missing.join(",")})`, ["summary", "issuetype"], false).catch(() => []);
     const names = new Map(found.map((e) => [e.key as string, { summary: String(e.fields?.summary ?? e.key), type: String(e.fields?.issuetype?.name ?? "Epic") }]));
     for (const i of issues) if (i.parent && names.has(i.parent.key)) i.parent = { key: i.parent.key, ...names.get(i.parent.key)! };
   }
@@ -417,6 +424,7 @@ export async function pullFromJira(app: Battlestation, options: PullOptions): Pr
   }
 
   const who = String(me.displayName ?? me.name ?? me.accountId ?? "you");
+  if (settings.jira.baseUrl !== options.connection.baseUrl) app.updateSettings(options.actor ?? "pull", { jira: { baseUrl: options.connection.baseUrl } });
   const result = app.recordPull(options.actor ?? "pull", { issues, sprints: [...sprints.values()], me: who, at: fetchedAt });
   return { ...result, me: who };
 }

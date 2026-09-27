@@ -131,7 +131,7 @@ export function createApiServer({ app, version, staticDir = null, mode = "live",
           subtitle: text(b.subtitle),
           capacityPoints: b.capacityPoints === null ? null : typeof b.capacityPoints === "number" ? b.capacityPoints : undefined,
           staleAfterDays: typeof b.staleAfterDays === "number" ? b.staleAfterDays : undefined,
-          jira: { baseUrl: nullableText(b.jiraBaseUrl), boardId: nullableText(b.boardId), jql: text(b.jql) },
+          jira: { boardId: nullableText(b.boardId), jql: text(b.jql) },
         }),
     ],
   ]);
@@ -166,23 +166,45 @@ export function createApiServer({ app, version, staticDir = null, mode = "live",
       "content-type": type,
       "cache-control": isFile && file !== join(root, "index.html") && KEEPABLE.test(file + search) ? "public, max-age=31536000, immutable" : "no-cache",
       "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "content-security-policy": "frame-ancestors 'none'",
     });
     if (req.method === "HEAD") res.end();
-    else createReadStream(file).pipe(res);
+    else
+      createReadStream(file)
+        .on("error", () => res.destroy())
+        .pipe(res);
   }
 
-  /** A change is JSON from this server's own pages. */
+  /**
+   * A change is JSON from this server's own pages: an origin with the same
+   * host and port, and a browser that says the request is from the same
+   * origin. Another page on this machine, on another port, is not one.
+   */
   function fromOwnPage(req: IncomingMessage): boolean {
     const origin = req.headers.origin;
-    const own = !origin || hostOf(origin.replace(/^https?:\/\//, "")) === hostOf(req.headers.host);
-    return own && (req.headers["content-type"] ?? "").includes("application/json") && req.headers["sec-fetch-site"] !== "cross-site";
+    let sameOrigin = !origin;
+    if (origin) {
+      try {
+        sameOrigin = new URL(origin).host === req.headers.host;
+      } catch {
+        sameOrigin = false;
+      }
+    }
+    const site = req.headers["sec-fetch-site"];
+    return sameOrigin && (site === undefined || site === "same-origin" || site === "none") && (req.headers["content-type"] ?? "").includes("application/json");
   }
 
   return createServer((req, res) => {
     // Only a request that names this machine is answered.
     if (!LOCAL_HOSTS.has(hostOf(req.headers.host) ?? "")) return sendJson(res, 421, { error: "This server answers only to localhost." });
 
-    const url = new URL(req.url ?? "/", "http://localhost");
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", "http://localhost");
+    } catch {
+      return sendJson(res, 400, { error: "Bad address." });
+    }
     const isApi = url.pathname.startsWith("/api/");
 
     // Reading from Jira takes time, so it is the one change that answers later.
@@ -191,13 +213,17 @@ export function createApiServer({ app, version, staticDir = null, mode = "live",
       if (mode === "mock") return sendJson(res, 400, { error: "The mock has no Jira to read from." });
       let connection;
       try {
-        connection = connectionFromEnv(env, app.getSettings().jira.baseUrl);
+        connection = connectionFromEnv(env);
       } catch (err) {
         return sendJson(res, 400, { error: (err as Error).message });
       }
       pullFromJira(app, { connection, fetch, actor: "bridge" }).then(
         (r) => sendJson(res, 200, r),
-        (err) => sendJson(res, err instanceof JiraError || err instanceof DomainError ? 502 : 500, { error: err instanceof JiraError || err instanceof DomainError ? err.message : "The pull failed. See the server log." }),
+        (err) => {
+          if (err instanceof JiraError || err instanceof DomainError) return sendJson(res, 502, { error: err.message });
+          console.error("[battlestation] pull error:", err);
+          sendJson(res, 500, { error: "The pull failed. See the server log." });
+        },
       );
       return;
     }
